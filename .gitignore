@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 本地配置（可能包含 API Key，不提交）
+settings.json
+
+# 输出目录（程序运行时自动重建）
+cards/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# IDE / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
