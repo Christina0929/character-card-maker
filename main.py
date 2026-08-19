@@ -231,12 +231,19 @@ class App(ctk.CTk):
             sw_engine.select()
         sw_engine.grid(row=4, column=1, sticky="w", pady=6, padx=(8, 0))
 
+        ctk.CTkLabel(form, text="卡片风格分支：", font=FONT).grid(row=5, column=0, sticky="w", pady=6)
+        branches = ["通用", "恋爱养成", "宿命剧情", "CP互动"]
+        cb_branch = ctk.CTkComboBox(form, values=branches, font=FONT, width=220)
+        cb_branch.set(s.get("card_branch", "通用"))
+        cb_branch.grid(row=5, column=1, sticky="w", pady=6, padx=(8, 0))
+
         def save():
             self.settings["base_url"] = e_base.get().strip() or "https://api.deepseek.com/v1"
             self.settings["api_key"] = e_key.get().strip()
             self.settings["model"] = e_model.get().strip() or "deepseek-chat"
             self.settings["use_web_search"] = bool(sw_search.get())
             self.settings["use_roleplay_engine"] = bool(sw_engine.get())
+            self.settings["card_branch"] = cb_branch.get().strip() or "通用"
             sm.save(self.settings)
             win.destroy()
             messagebox.showinfo("设置", "已保存。", parent=self)
@@ -419,13 +426,14 @@ class App(ctk.CTk):
             if self.settings.get("use_roleplay_engine", True):
                 rp_engine = _load_roleplay_engine()
 
-            # ---- AI 模式：一次生成完整长卡（千夏/达妮娅风格） ----
+            # ---- AI 模式：一次生成完整长卡（作者模板 v0.4：千夏/达妮娅/夏弥/多托雷风格） ----
             long_card: Dict[str, Any] = {}
+            branch = self.settings.get("card_branch", "通用")
             if use_api:
                 try:
                     long_card = llm.generate_full_card_json(
                         self.character, self.settings, info=info,
-                        correction=self.correction)
+                        correction=self.correction, card_branch=branch)
                 except Exception as e:
                     print(f"[llm full-card] 失败降级分段生成: {e}")
 
@@ -471,6 +479,17 @@ class App(ctk.CTk):
                     classic_lines=long_card.get("classic_lines") or {},
                     likes_dislikes=long_card.get("likes_dislikes") or [],
                     core_values=long_card.get("core_values") or [],
+                    self_referral=long_card.get("self_referral") or [],
+                    appellation_rules=long_card.get("appellation_rules") or [],
+                    affinity_system=long_card.get("affinity_system") or {},
+                    affinity_dialogues=long_card.get("affinity_dialogues") or {},
+                    inner_monologues=long_card.get("inner_monologues") or {},
+                    physical_interactions=long_card.get("physical_interactions") or {},
+                    social_relations=long_card.get("social_relations") or {},
+                    communication_codes=long_card.get("communication_codes") or {},
+                    scene_dialogues=long_card.get("scene_dialogues") or {},
+                    story_timeline=long_card.get("story_timeline") or {},
+                    extra_settings=long_card.get("extra_settings") or {},
                     roleplay_engine=rp_engine,
                 )
                 mode_tag = "AI 完整长卡模式"
