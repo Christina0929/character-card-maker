@@ -21,7 +21,7 @@ def load() -> Dict[str, Any]:
     if not os.path.exists(SETTINGS_PATH):
         return dict(DEFAULTS)
     try:
-        with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+        with open(SETTINGS_PATH, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
         merged = dict(DEFAULTS)
         merged.update(data)

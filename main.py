@@ -445,9 +445,9 @@ class App(ctk.CTk):
             if name and name != "未命名角色" and self.settings.get("use_web_search", True):
                 info = qs.search_character_info(self.character, count=4)
 
-            # Roleplay 引擎模板（可选附加）
+            # Roleplay 引擎模板（可选附加，默认关闭；开启才附加）
             rp_engine = ""
-            if self.settings.get("use_roleplay_engine", True):
+            if self.settings.get("use_roleplay_engine", False):
                 rp_engine = _load_roleplay_engine()
 
             # ---- AI 模式：一次生成完整长卡（作者模板 v0.4：千夏/达妮娅/夏弥/多托雷风格） ----
