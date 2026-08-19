@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 import customtkinter as ctk
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, font as tkfont
 
 import settings_manager as sm
 import quote_service as qs
@@ -18,6 +18,7 @@ from character_model import CharacterCard
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CARDS_DIR = os.path.join(BASE_DIR, "cards")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+FONTS_DIR = os.path.join(BASE_DIR, "fonts")
 os.makedirs(CARDS_DIR, exist_ok=True)
 
 
@@ -34,10 +35,61 @@ def _load_roleplay_engine() -> str:
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-FONT = ("微软雅黑", 14)
-FONT_SMALL = ("微软雅黑", 12)
-FONT_TITLE = ("微软雅黑", 20, "bold")
-FONT_BTN = ("微软雅黑", 14, "bold")
+# ---------- 字体方案：优先霞鹜文楷（本地字体库），失败回退微软雅黑 ----------
+def _load_local_fonts() -> bool:
+    """用 Windows GDI 将项目内嵌字体临时注册到当前进程（AddFontResourceEx, 私有加载不污染系统）"""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        gdi32 = ctypes.WinDLL("gdi32")
+        FR_PRIVATE = 0x10
+        ok = False
+        for fname in ("LXGWWenKai-Regular.ttf", "LXGWWenKai-Medium.ttf"):
+            p = os.path.join(FONTS_DIR, fname)
+            if os.path.exists(p):
+                r = gdi32.AddFontResourceExW(wintypes.LPCWSTR(p), FR_PRIVATE, 0)
+                if r:
+                    ok = True
+        return ok
+    except Exception as e:
+        print(f"[font] GDI 注册失败: {e}")
+        return False
+
+
+def _resolve_font() -> str:
+    """注册项目内嵌字体，返回可用字体族名；加载失败回退微软雅黑"""
+    if _load_local_fonts():
+        import tkinter as _tk
+        from tkinter import font as _tkfont
+        try:
+            _r = _tk.Tk()
+            _r.withdraw()
+            families = set(_tkfont.families())
+            _r.destroy()
+            for cand in ("霞鹜文楷", "LXGW WenKai", "LXGWWenKai"):
+                if cand in families:
+                    return cand
+        except Exception as e:
+            print(f"[font] 字体族名探测失败: {e}")
+    return "微软雅黑"
+
+
+UI_FONT = _resolve_font()
+print(f"[font] 界面字体: {UI_FONT}")
+
+FONT = (UI_FONT, 14)
+FONT_SMALL = (UI_FONT, 12)
+FONT_TITLE = (UI_FONT, 20, "bold")
+FONT_BTN = (UI_FONT, 14, "bold")
+
+# ---------- 主题配色：暖金深色（与霞鹜文楷的温润感搭配） ----------
+COLOR_BG = "#1a1820"        # 窗口背景：深暖灰黑
+COLOR_PANEL = "#211f29"     # 面板/卡片背景
+COLOR_ACCENT = "#d4a95c"    # 主强调：暖金
+COLOR_ACCENT_HOVER = "#e0bc7a"  # 强调悬停
+COLOR_MUTED = "#6b6572"     # 次要文字
+COLOR_TEXT = "#e8e4da"      # 主文字：暖白
+COLOR_DANGER = "#b04a4a"    # 危险/删除
 
 
 class App(ctk.CTk):
@@ -46,6 +98,7 @@ class App(ctk.CTk):
         self.title("人物卡生成器")
         self.geometry("1100x720")
         self._center()
+        self.configure(fg_color=COLOR_BG)
 
         self.settings = sm.load()
         self.character: Dict[str, Any] = {}
@@ -56,8 +109,14 @@ class App(ctk.CTk):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.tabs = ctk.CTkTabview(self, fg_color="#1e1e2e")
-        self.tabs.grid(row=0, column=0, padx=12, pady=12, sticky="nsew")
+        self.tabs = ctk.CTkTabview(self, fg_color=COLOR_PANEL)
+        self.tabs.grid(row=0, column=0, padx=14, pady=14, sticky="nsew")
+        # tab 按钮样式（暖金激活态）
+        self.tabs._segmented_button.configure(
+            fg_color=COLOR_BG, selected_color=COLOR_ACCENT, selected_hover_color=COLOR_ACCENT_HOVER,
+            unselected_color="#2a2733", unselected_hover_color="#35313f",
+            text_color=COLOR_MUTED, text_color_disabled=COLOR_MUTED,
+        )
         self.tab_input = self.tabs.add("① 人设输入")
         self.tab_clarify = self.tabs.add("② 补齐信息")
         self.tab_result = self.tabs.add("③ 生成结果")
@@ -84,7 +143,9 @@ class App(ctk.CTk):
         ctk.CTkButton(top, text="⚙ 设置", width=90, font=FONT_BTN,
                       command=self.open_settings).grid(row=0, column=1, sticky="e", padx=(8, 0))
 
-        self.input_box = ctk.CTkTextbox(p, font=FONT, height=220, wrap="word")
+        self.input_box = ctk.CTkTextbox(p, font=FONT, height=220, wrap="word",
+                                        fg_color=COLOR_PANEL, border_width=1, border_color="#33303d",
+                                        text_color=COLOR_TEXT)
         self.input_box.grid(row=1, column=0, sticky="nsew", padx=8, pady=4)
 
         row2 = ctk.CTkFrame(p, fg_color="transparent")
@@ -94,6 +155,7 @@ class App(ctk.CTk):
         self.name_entry = ctk.CTkEntry(row2, font=FONT)
         self.name_entry.grid(row=0, column=1, sticky="ew", padx=8)
         ctk.CTkButton(row2, text="下一步：补齐人设 →", font=FONT_BTN,
+                      fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER, text_color="#1a1820",
                       command=self.go_clarify).grid(row=0, column=2, padx=(8, 0))
 
         # 提示：动态显示 API 状态与填写规则
@@ -105,7 +167,7 @@ class App(ctk.CTk):
         tip = ctk.CTkLabel(
             p,
             text=tip_text,
-            font=FONT_SMALL, text_color="#888", justify="left", wraplength=560,
+            font=FONT_SMALL, text_color=COLOR_MUTED, justify="left", wraplength=560,
         )
         tip.grid(row=3, column=0, sticky="w", padx=8, pady=(0, 4))
 
@@ -114,7 +176,7 @@ class App(ctk.CTk):
                 p,
                 text="💡 建议：到 ⚙ 设置填入 API Key（DeepSeek/Kimi/OpenAI 兼容接口），"
                      "将生成数千字的完整作者风格长卡；当前未配置，使用本地模板模式（内容较简略）。",
-                font=FONT_SMALL, text_color="#c98a2d", justify="left", wraplength=560,
+                font=FONT_SMALL, text_color=COLOR_ACCENT, justify="left", wraplength=560,
             )
             tip_api.grid(row=4, column=0, sticky="w", padx=8, pady=(0, 4))
 
@@ -145,22 +207,27 @@ class App(ctk.CTk):
         self.q_entry.grid(row=0, column=1, sticky="ew", padx=(0, 8))
         self.q_entry.bind("<Return>", lambda e: self._confirm_answer())
         ctk.CTkButton(input_row, text="✅ 确认", width=90, font=FONT_BTN,
+                      fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER, text_color="#1a1820",
                       command=self._confirm_answer).grid(row=0, column=2, padx=(0, 8))
-        ctk.CTkButton(input_row, text="跳过", width=90, font=FONT_BTN, fg_color="#555",
-                      command=self._skip_field).grid(row=0, column=3)
+        ctk.CTkButton(input_row, text="跳过", width=90, font=FONT_BTN, fg_color="#4a4552",
+                      hover_color="#5a5463", command=self._skip_field).grid(row=0, column=3)
 
-        self.summary_box = ctk.CTkTextbox(body, font=FONT_SMALL, height=160, wrap="word")
+        self.summary_box = ctk.CTkTextbox(body, font=FONT_SMALL, height=160, wrap="word",
+                                          fg_color=COLOR_PANEL, border_width=1, border_color="#33303d",
+                                          text_color=COLOR_TEXT)
         self.summary_box.grid(row=3, column=0, sticky="nsew", pady=(8, 4))
         self.summary_box.configure(state="disabled")
 
         bottom = ctk.CTkFrame(p, fg_color="transparent")
         bottom.grid(row=2, column=0, sticky="ew", padx=8, pady=(4, 8))
         bottom.grid_columnconfigure(0, weight=1)
-        self.progress_lbl = ctk.CTkLabel(bottom, text="", font=FONT_SMALL, text_color="#888")
+        self.progress_lbl = ctk.CTkLabel(bottom, text="", font=FONT_SMALL, text_color=COLOR_MUTED)
         self.progress_lbl.grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(bottom, text="← 返回修改", width=120, font=FONT_BTN, fg_color="#555",
+        ctk.CTkButton(bottom, text="← 返回修改", width=120, font=FONT_BTN, fg_color="#4a4552",
+                      hover_color="#5a5463",
                       command=lambda: self.tabs.set("① 人设输入")).grid(row=0, column=1, padx=(8, 0))
         self.gen_btn = ctk.CTkButton(bottom, text="⏩ 跳过剩余，直接生成", font=FONT_BTN,
+                                     fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER, text_color="#1a1820",
                                      command=self.go_generate)
         self.gen_btn.grid(row=0, column=2, padx=(8, 0))
 
@@ -179,7 +246,9 @@ class App(ctk.CTk):
         self.status_lbl = ctk.CTkLabel(top, text="就绪", font=FONT_SMALL, text_color="#888")
         self.status_lbl.grid(row=0, column=1, sticky="e", padx=12)
 
-        self.result_box = ctk.CTkTextbox(p, font=FONT, wrap="word")
+        self.result_box = ctk.CTkTextbox(p, font=FONT, wrap="word",
+                                         fg_color=COLOR_PANEL, border_width=1, border_color="#33303d",
+                                         text_color=COLOR_TEXT)
         self.result_box.grid(row=2, column=0, sticky="nsew", padx=8, pady=4)
         self.result_box.configure(state="disabled")
 
@@ -187,17 +256,22 @@ class App(ctk.CTk):
         btns.grid(row=3, column=0, sticky="ew", padx=8, pady=(4, 8))
         btns.grid_columnconfigure(2, weight=1)
         # 次级操作靠左
-        ctk.CTkButton(btns, text="🔄 重新生成", width=130, font=FONT_BTN, fg_color="#444",
+        ctk.CTkButton(btns, text="🔄 重新生成", width=130, font=FONT_BTN, fg_color="#4a4552",
+                      hover_color="#5a5463",
                       command=self.regenerate).grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(btns, text="✏ 编辑人设总结", width=130, font=FONT_BTN, fg_color="#444",
+        ctk.CTkButton(btns, text="✏ 编辑人设总结", width=130, font=FONT_BTN, fg_color="#4a4552",
+                      hover_color="#5a5463",
                       command=self.edit_description).grid(row=0, column=1, sticky="w", padx=(8, 0))
-        ctk.CTkButton(btns, text="📋 复制全文", width=130, font=FONT_BTN, fg_color="#444",
+        ctk.CTkButton(btns, text="📋 复制全文", width=130, font=FONT_BTN, fg_color="#4a4552",
+                      hover_color="#5a5463",
                       command=self.copy_card).grid(row=0, column=2, sticky="w", padx=(8, 0))
         # 主操作靠右
         self.confirm_btn = ctk.CTkButton(btns, text="✅ 确认准确，保存卡片", width=200, font=FONT_BTN,
+                                         fg_color=COLOR_ACCENT, hover_color=COLOR_ACCENT_HOVER, text_color="#1a1820",
                                          command=self.ask_confirm)
         self.confirm_btn.grid(row=0, column=3, sticky="e", padx=(8, 0))
-        ctk.CTkButton(btns, text="← 返回修改", width=120, font=FONT_BTN, fg_color="#555",
+        ctk.CTkButton(btns, text="← 返回修改", width=120, font=FONT_BTN, fg_color="#4a4552",
+                      hover_color="#5a5463",
                       command=lambda: self.tabs.set("② 补齐信息")).grid(row=0, column=4, sticky="e", padx=(8, 0))
 
     # ---------- 设置对话框 ----------
@@ -213,7 +287,7 @@ class App(ctk.CTk):
         ctk.CTkLabel(
             win,
             text="填入 OpenAI 兼容接口（DeepSeek / Kimi / OpenAI 等）的 Key 即可启用 AI 生成；\n留空则自动使用本地模板模式。",
-            font=FONT_SMALL, text_color="#888", justify="left",
+            font=FONT_SMALL, text_color=COLOR_MUTED, justify="left",
         ).grid(row=1, column=0, sticky="w", padx=20)
 
         form = ctk.CTkFrame(win, fg_color="transparent")
