@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 
 import settings_manager as sm
 import quote_service as qs
@@ -98,7 +98,7 @@ class App(ctk.CTk):
 
         tip = ctk.CTkLabel(
             p,
-            text="提示：越具体越能减少后续提问。示例：一位孤僻的图书馆管理员，毒舌但心软，喜欢吐槽读者。",
+            text="提示：角色描述和角色名填一个即可。描述越具体越能减少后续提问。示例：一位孤僻的图书馆管理员，毒舌但心软，喜欢吐槽读者。",
             font=FONT_SMALL, text_color="#888",
         )
         tip.grid(row=3, column=0, sticky="w", padx=8, pady=(0, 4))
@@ -176,6 +176,8 @@ class App(ctk.CTk):
                       command=self.regenerate).grid(row=0, column=0, sticky="w")
         ctk.CTkButton(btns, text="✏ 编辑描述", width=130, font=FONT_BTN, fg_color="#444",
                       command=self.edit_description).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        ctk.CTkButton(btns, text="📋 复制全文", width=130, font=FONT_BTN, fg_color="#444",
+                      command=self.copy_card).grid(row=0, column=2, sticky="w", padx=(8, 0))
         # 主操作靠右
         self.confirm_btn = ctk.CTkButton(btns, text="✅ 确认准确，保存卡片", width=200, font=FONT_BTN,
                                          command=self.ask_confirm)
@@ -251,12 +253,34 @@ class App(ctk.CTk):
         ctk.CTkButton(win, text="💾 保存设置", font=FONT_BTN, command=save).grid(row=5, column=0, pady=12)
 
     # ---------- 流程：输入 → 澄清 ----------
+    def _extract_name(self, raw: str) -> str:
+        """从描述文本中提取角色名：优先「」/『』/【】括号，其次'名叫X/名字叫X/名为X'等句式"""
+        import re as _re
+        for pat in [r"[「『【]([^」』】]{1,20})",
+                    r"(?:名叫|名字叫|名为|姓名|人称)\s*[「『\"]?([\u4e00-\u9fff·]{1,6}?)(?=[的的是，,。.！!？?」』]|$)"]:
+            m = _re.search(pat, raw)
+            if m:
+                cand = m.group(1).strip()
+                if cand and cand not in ("我", "他", "她", "它"):
+                    return cand
+        # 兜底：第一句较短（≤8字）时直接取第一句
+        first = raw.splitlines()[0].strip().rstrip("，。；！？,.;!?")
+        if 1 <= len(first) <= 8 and not any(c.isdigit() for c in first):
+            return first
+        return "未命名角色"
+
     def go_clarify(self):
         raw = self.input_box.get("1.0", "end").strip()
-        if not raw:
-            messagebox.showwarning("提示", "请先输入角色设定。", parent=self)
-            return
         name = self.name_entry.get().strip()
+        if not raw and not name:
+            messagebox.showwarning("提示", "请输入角色描述或角色名（二选一即可）。", parent=self)
+            return
+        if not name:
+            # 从描述中提取角色名（「XX」或 《XX》 或「名叫XX」等），提取不到用未命名
+            name = self._extract_name(raw)
+        if not raw:
+            # 只有名字：构造最小描述，作为后续澄清的上下文
+            raw = f"角色名：{name}。这是一个还未完善细节的角色，请帮我补全设定。"
         self.character = tg.extract_persona(raw, name)
 
         # 构建待问字段队列：原文里没出现对应关键词的字段才问
@@ -588,6 +612,15 @@ class App(ctk.CTk):
         self.correction = ""
         self._do_generate()
 
+    def copy_card(self):
+        """复制完整卡片全文到剪贴板"""
+        if not self.last_card:
+            return
+        md = self.last_card.to_markdown()
+        self.clipboard_clear()
+        self.clipboard_append(md)
+        self.status_lbl.configure(text="📋 已复制完整卡片到剪贴板")
+
     def edit_description(self):
         if not self.last_card:
             return
@@ -617,13 +650,13 @@ class App(ctk.CTk):
         card = self.last_card
         win = ctk.CTkToplevel(self)
         win.title("确认人设准确性")
-        win.geometry("680x540")
+        win.geometry("820x640")
         win.transient(self)
         win.grab_set()
-        ctk.CTkLabel(win, text=f"角色【{card.name}】的人设总结：", font=FONT_TITLE).pack(pady=(12, 4))
-        tb = ctk.CTkTextbox(win, font=FONT, wrap="word", height=300)
+        ctk.CTkLabel(win, text=f"角色【{card.name}】完整卡片预览（可滚动检查）：", font=FONT_TITLE).pack(pady=(12, 4))
+        tb = ctk.CTkTextbox(win, font=FONT, wrap="word", height=380)
         tb.pack(fill="both", expand=True, padx=12, pady=4)
-        tb.insert("1.0", card.description)
+        tb.insert("1.0", card.to_markdown())
         tb.configure(state="disabled")
 
         btns = ctk.CTkFrame(win, fg_color="transparent")
@@ -641,12 +674,19 @@ class App(ctk.CTk):
             win.destroy()
             self.edit_description()
 
+        def copy():
+            win.clipboard_clear()
+            win.clipboard_append(card.to_markdown())
+            messagebox.showinfo("复制", "✅ 完整卡片已复制到剪贴板。", parent=win)
+
         ctk.CTkButton(btns, text="✅ 准确，保存卡片", font=FONT_BTN,
                       command=accurate).grid(row=0, column=0, padx=4)
+        ctk.CTkButton(btns, text="📋 复制完整卡片", font=FONT_BTN, fg_color="#555",
+                      command=copy).grid(row=0, column=1, padx=4)
         ctk.CTkButton(btns, text="❌ 不准确，重新生成", font=FONT_BTN, fg_color="#aa3030",
-                      command=wrong).grid(row=0, column=1, padx=4)
+                      command=wrong).grid(row=0, column=2, padx=4)
         ctk.CTkButton(btns, text="✏ 手动修改后保存", font=FONT_BTN, fg_color="#555",
-                      command=manual).grid(row=0, column=2, padx=4)
+                      command=manual).grid(row=0, column=3, padx=4)
 
     def _ask_correction(self):
         win = ctk.CTkToplevel(self)
@@ -673,35 +713,29 @@ class App(ctk.CTk):
         card = self.last_card
         safe = "".join(c for c in card.name if c.isalnum() or c in "._-") or "角色"
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        md_path = os.path.join(CARDS_DIR, f"{safe}_{ts}.md")
-        json_path = os.path.join(CARDS_DIR, f"{safe}_{ts}.json")
+        default_name = f"{safe}_{ts}.txt"
+        path = filedialog.asksaveasfilename(
+            title="保存人物卡",
+            initialdir=CARDS_DIR,
+            initialfile=default_name,
+            defaultextension=".txt",
+            filetypes=[("文本文件", "*.txt"), ("Markdown 文件", "*.md"), ("JSON 文件", "*.json")],
+        )
+        if not path:
+            return  # 用户取消
         try:
-            with open(md_path, "w", encoding="utf-8") as f:
-                f.write(card.to_markdown())
-            with open(json_path, "w", encoding="utf-8") as f:
-                json.dump(card.to_dict(), f, ensure_ascii=False, indent=2)
+            ext = os.path.splitext(path)[1].lower()
+            if ext == ".json":
+                content = json.dumps(card.to_dict(), ensure_ascii=False, indent=2)
+            else:
+                content = card.to_markdown()
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
         except Exception as e:
             messagebox.showerror("保存失败", str(e), parent=self)
             return
 
-        win = ctk.CTkToplevel(self)
-        win.title("保存成功")
-        win.geometry("520x240")
-        win.transient(self)
-        win.grab_set()
-        ctk.CTkLabel(win, text="✅ 卡片已保存！", font=FONT_TITLE).pack(pady=(16, 4))
-        ctk.CTkLabel(win, text=md_path, font=FONT_SMALL, text_color="#888",
-                     wraplength=480).pack(padx=12)
-
-        def open_dir():
-            try:
-                os.startfile(CARDS_DIR)
-            except Exception as e:
-                print(f"[startfile] {e}")
-
-        ctk.CTkButton(win, text="📁 打开卡片文件夹", font=FONT_BTN, command=open_dir).pack(pady=12)
-        ctk.CTkButton(win, text="完成", font=FONT_BTN, fg_color="#555",
-                      command=win.destroy).pack()
+        messagebox.showinfo("保存成功", f"✅ 人物卡已保存：\n{path}", parent=self)
 
 
 def main():
