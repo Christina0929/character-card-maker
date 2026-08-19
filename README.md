@@ -1,95 +1,90 @@
-# 人物卡生成器
+# Character Card Maker
 
-> **⚠️ 仍在测试阶段（Work in Progress）**：项目功能与界面可能随时调整，尚未发布正式版本。欢迎试用与反馈。
+> **⚠️ Work in Progress** — Features and UI may change at any time. No stable release yet. Feedback is welcome.
 
-一个桌面 GUI 程序，用于做「人物卡」：根据你的一句话构想，补齐人设细节，生成包含**角色台词**和**符合人设的对话**的完整人物卡，最后让你确认人设是否准确。
+A desktop GUI tool that turns a one-line character idea into a complete **character card**: it fills in missing persona details, generates **character lines** and **in-character dialogue**, and asks you to confirm the persona before saving.
 
-## 特性
+## Features
 
-- **桌面 GUI**：基于 CustomTkinter 的深色界面，全程鼠标操作，无需命令行。
-- **不确定就停下来问你**：程序检测到说话风格、口头禅、背景、性格特质缺失时，会逐项询问，并提供选项 + 自由填写 + 跳过三种方式。
-- **双模式生成对话**：
-  - **AI 模式**（有 API Key）：调用 OpenAI 兼容大模型（DeepSeek / Kimi / OpenAI 等）生成符合人设的口语化台词和人设总结。
-  - **本地模板模式**（无 Key）：内置 8 种说话风格（毒舌/温柔/高冷/中二/沉稳/活泼/老成/天然呆）的对话模板库，零配置即可使用。
-- **角色台词获取**（只收「她/他说过的」）：
-  - **AI 模式**：LLM 凭记忆输出知名角色的真实台词；原创角色则创作贴合人设的台词。
-  - **无 Key**：优先匹配内置知名角色台词库（`quotes/characters.json`，含路飞/柯南/孙悟空等 20+ 角色），再尝试联网搜索角色台词，最后用本地模板生成。
-  - **原创角色**不拉通用名言——直接生成她/他会说的话，不会再出现「啥角色都来句天行健」。
-- **最终确认环节**：生成完整人设总结后，弹窗展示描述让你判断是否准确；不准确可一句话反馈偏差，程序据此重新生成。
-- **导出**：确认后保存为 `cards/{角色名}_{时间戳}.md`（markdown 卡片）和 `.json`（结构化数据）。
+- **Desktop GUI** — dark CustomTkinter interface, fully mouse-driven, no command line required.
+- **Asks when it's not sure** — if the speaking style, catchphrase, background, or personality traits are missing, it walks you through them one by one, with dropdown options, free-form input, and a skip button.
+- **Dual-mode dialogue generation**:
+  - **AI mode** (with API key): calls any OpenAI-compatible model (DeepSeek / Kimi / OpenAI, etc.) to write natural, in-character dialogue and a persona summary.
+  - **Local template mode** (no key): built-in dialogue templates for 8 speaking styles (sharp-tongued / gentle / aloof / chuunibyou / calm / lively / mature / airheaded) — works out of the box.
+- **Character lines that they actually said**:
+  - **AI mode**: the LLM recalls real lines from well-known characters; for original characters it writes lines that fit the persona.
+  - **No key**: matches against the built-in quote library (`quotes/characters.json`, 25+ characters like Luffy, Conan, Sun Wukong), then tries web search, then falls back to templates.
+  - **Original characters never get canned quotes** — no more "everyone says 天行健".
+- **Online character research**: for real, existing characters, the app searches the web (Moegirlpedia first, Bing as fallback) and shows what it found in a dedicated "Character Info (Web)" section of the card. With an API key, the research is fed to the AI as source material.
+- **Final confirmation**: after the persona summary is generated, a dialog asks whether it's accurate. If not, you can give one-line feedback and the AI regenerates with the correction in mind.
+- **Export**: saves `cards/{character}_{timestamp}.md` (readable card) and `.json` (structured data).
 
-## 安装
+## Installation
 
-需要 Python 3.10+（在 Python 3.12 上测试通过）。
+Requires Python 3.10+ (tested on Python 3.12).
 
 ```bash
-cd C:\Users\Administrator\Desktop\character-card-maker
+cd character-card-maker
 pip install -r requirements.txt
 ```
 
-依赖：`customtkinter`、`requests`。
+Dependencies: `customtkinter`, `requests`.
 
-## 运行
+## Usage
 
-```bash
-python main.py
-```
+### Step 1: Enter the persona
+In the "① 人设输入" tab, describe your character in a sentence or two. For example:
 
-## 使用流程
+> A reclusive librarian, sharp-tongued but soft-hearted, likes to mock the readers
 
-### 第一步：输入人设
-在「① 人设输入」标签页里，用一两句话描述你想做的人物。例如：
+The character name can be left blank (the app will let you set it later). Click "⚙ 设置" in the top-right to configure an API key (see below).
 
-> 一位孤僻的图书馆管理员，毒舌但心软，喜欢吐槽读者
+### Step 2: Fill in the details
+Switch to the "② 补齐信息" tab. The app extracts speaking style, catchphrase, background, and traits from your description. **Fields it couldn't detect are asked one by one**:
 
-角色名可以留空（程序会让你定）。点右上角「⚙ 设置」配置 API（见下文）。
+- Each question offers a dropdown of options plus a free-form input — just pick one or type your own, then hit "✅ 确认" (Enter works too).
+- A live summary of the current persona is shown on the right.
+- Once the last question is answered, the app **auto-jumps to generation** — no extra button to press. The "⏩ 跳过剩余，直接生成" button is there only if you want to skip the remaining questions and generate right away.
 
-### 第二步：补齐信息
-切到「② 补齐信息」标签页。程序会用关键词识别从你的描述里抽取说话风格、口头禅、背景、性格特质等。**没识别到的关键字段会逐项问你**：
+### Step 3: Generate
+In the "③ 生成结果" tab, the app:
 
-- 每个问题给你一组候选选项（下拉框）+ 自由填写框 + 「跳过（你来定）」按钮。
-- 右侧实时显示「当前人设信息」汇总。
-- 全部答完（或点「信息够了，开始生成」）即可进入下一步。
+1. Collects 5 character lines (AI mode recalls/creates them; no-key mode: built-in library → web search → templates).
+2. Generates 3–5 in-character dialogues (AI in AI mode, templates otherwise).
+3. Writes a persona summary.
 
-### 第三步：生成结果
-切到「③ 生成结果」标签页。程序会：
+The result is shown as a full markdown card, including sections for **character info (web research)**, **relationships**, **likes & dislikes**, and **core values** (the last three require AI mode). You can "🔄 重新生成" or "✏ 编辑描述" to adjust.
 
-1. 获取 5 句角色台词（有 Key 用 LLM 回忆/创作；无 Key 内置台词库 → 联网搜索 → 模板生成）。
-2. 生成 3-5 句符合人设的对话（有 Key 用 AI，没 Key 用模板）。
-3. 生成一段人设总结描述。
+### Step 4: Confirm accuracy
+Click "✅ 确认准确，保存卡片" to open the confirmation dialog with the full persona summary. Three options:
 
-结果区会以 markdown 形式展示完整人物卡。可以「🔄 重新生成」或「✏ 编辑描述」手动调整。
+- **准确，保存卡片**: saves to the `cards/` directory and lets you open the folder.
+- **不准确，重新生成**: type what's wrong; the feedback is fed back to the AI for regeneration.
+- **手动修改后保存**: edit the summary text directly, then save.
 
-### 第四步：确认准确性
-点「✅ 确认：这段描述准确吗？」弹出确认窗口，展示人设总结全文。三个选项：
+## API Configuration (optional but recommended)
 
-- **✅ 准确，保存卡片**：保存到 `cards/` 目录，弹出保存成功窗口，可一键打开文件夹。
-- **❌ 不准确，重新生成**：让你输入「哪里不对」，程序把这条反馈喂给 AI 重新生成。
-- **✏ 手动修改后保存**：直接编辑描述文本再保存。
+Click "⚙ 设置" on the main window:
 
-## 配置 API（可选但推荐）
+| Field | Description | Example |
+|-------|-------------|---------|
+| API Base URL | OpenAI-compatible endpoint | `https://api.deepseek.com/v1` |
+| API Key | Your key (leave blank for local template mode) | `sk-...` |
+| Model | Model to call | `deepseek-chat` |
+| 联网搜索角色台词 | Web search for character lines (no-key mode) | on |
 
-点主界面「⚙ 设置」：
+Settings are stored in `settings.json`. **Leaving the API key blank still works** — dialogue and summary just fall back to local templates.
 
-| 字段 | 说明 | 示例 |
-|------|------|------|
-| API Base URL | OpenAI 兼容接口地址 | `https://api.deepseek.com/v1` |
-| API Key | 你的密钥（留空则用本地模板） | `sk-...` |
-| 模型名 | 调用的模型 | `deepseek-chat` |
-| 联网搜索角色台词 | 是否联网搜索角色台词（无 Key 时生效） | 开启 |
+### Common endpoints
 
-设置保存在 `settings.json`。**留空 API Key 也能用**，只是对话和描述走本地模板模式。
+- **DeepSeek**: Base URL `https://api.deepseek.com/v1`, model `deepseek-chat`
+- **Kimi (Moonshot)**: Base URL `https://api.moonshot.cn/v1`, model `moonshot-v1-8k`
+- **OpenAI**: Base URL `https://api.openai.com/v1`, model `gpt-4o-mini`
+- **Qwen (通义千问)**: Base URL `https://dashscope.aliyuncs.com/compatible-mode/v1`, model `qwen-turbo`
 
-### 常见接口配置
+## Customizing the Quote Library
 
-- **DeepSeek**：Base URL `https://api.deepseek.com/v1`，模型 `deepseek-chat`
-- **Kimi（Moonshot）**：Base URL `https://api.moonshot.cn/v1`，模型 `moonshot-v1-8k`
-- **OpenAI**：Base URL `https://api.openai.com/v1`，模型 `gpt-4o-mini`
-- **通义千问**：Base URL `https://dashscope.aliyuncs.com/compatible-mode/v1`，模型 `qwen-turbo`
-
-## 知名角色台词库自定义
-
-编辑 `quotes/characters.json` 即可扩充内置台词库，格式为「角色名 → 台词数组」：
+Edit `quotes/characters.json` to extend the built-in library — format is "character name → array of lines":
 
 ```json
 {
@@ -97,28 +92,28 @@ python main.py
 }
 ```
 
-程序支持精确匹配和包含匹配（如「蒙奇·D·路飞」可命中「路飞」）。命中后直接使用这些**角色亲口说过的台词**，不联网、不编造。
+Both exact and substring matching are supported (e.g. "蒙奇·D·路飞" matches "路飞"). Matched characters get their **real spoken lines** — no web search, no fabrication.
 
-## 项目结构
+## Project Structure
 
 ```
 character-card-maker/
-├── main.py              # 入口 + GUI 主程序
-├── character_model.py   # 人物卡数据模型
-├── settings_manager.py  # 设置持久化
-├── llm_client.py        # OpenAI 兼容 API 客户端
-├── quote_service.py     # 角色台词获取（内置库 + 搜索）
-├── template_generator.py# 本地模板兜底生成器
-├── requirements.txt     # 依赖
-├── settings.json        # 设置（运行后生成）
-├── quotes/              # 内置知名角色台词库
-│   └── characters.json  # 角色名 → 经典台词（可自行扩充）
-└── cards/               # 保存的人物卡（运行后生成）
+├── main.py              # Entry point + GUI main program
+├── character_model.py   # Character card data model
+├── settings_manager.py  # Settings persistence
+├── llm_client.py        # OpenAI-compatible API client
+├── quote_service.py     # Character lines & info (local library + web search)
+├── template_generator.py# Local template fallback generator
+├── requirements.txt     # Dependencies
+├── settings.json        # Settings (created on first run)
+├── quotes/              # Built-in quote library
+│   └── characters.json  # character name → real lines (extendable)
+└── cards/               # Saved character cards (created on first run)
 ```
 
-## 技术说明
+## Technical Notes
 
-- 所有网络请求在独立线程执行，UI 不会卡顿。
-- AI 调用失败时自动降级到本地模板模式（不中断流程）。
-- 角色台词三级获取：AI 模式（LLM 回忆/创作）→ 内置台词库 → 联网搜索 → 模板生成；原创角色不拉通用名言。
-- 输出文件：`.md`（人看）+ `.json`（程序读，可二次加工）。
+- All network requests run on a separate thread; the UI never freezes.
+- If an AI call fails, the app automatically degrades to local template mode without breaking the flow.
+- Character lines are obtained via a cascade: AI mode (LLM recall/create) → built-in library → web search → templates. Original characters never get canned quotes.
+- Output files: `.md` (human-readable) + `.json` (structured, for further processing).
