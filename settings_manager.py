@@ -11,7 +11,7 @@ DEFAULTS: Dict[str, Any] = {
     "base_url": "https://api.deepseek.com/v1",
     "model": "deepseek-chat",
     "use_web_search": True,
-    "use_roleplay_engine": True,   # 保存卡片时附加 Roleplay 引擎模板（思维链/状态栏/时间流逝/行动推荐）
+    "use_roleplay_engine": False,  # 附加 Roleplay 引擎（HUD/时间流逝/行动推荐）默认关闭，需要时在设置里手动开启
     "card_branch": "通用",          # 卡片风格分支：通用 / 恋爱养成 / 宿命剧情 / CP互动
 }
 

@@ -228,8 +228,8 @@ class App(ctk.CTk):
         sw_search.grid(row=3, column=1, sticky="w", pady=6, padx=(8, 0))
 
         ctk.CTkLabel(form, text="附加 Roleplay 引擎：", font=FONT).grid(row=4, column=0, sticky="w", pady=6)
-        sw_engine = ctk.CTkSwitch(form, text="开启（思维链/状态栏/时间流逝/行动推荐）", font=FONT_SMALL)
-        if s.get("use_roleplay_engine", True):
+        sw_engine = ctk.CTkSwitch(form, text="开启（HUD状态栏/时间流逝/行动推荐）", font=FONT_SMALL)
+        if s.get("use_roleplay_engine", False):
             sw_engine.select()
         sw_engine.grid(row=4, column=1, sticky="w", pady=6, padx=(8, 0))
 
