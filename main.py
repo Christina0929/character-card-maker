@@ -96,12 +96,27 @@ class App(ctk.CTk):
         ctk.CTkButton(row2, text="下一步：补齐人设 →", font=FONT_BTN,
                       command=self.go_clarify).grid(row=0, column=2, padx=(8, 0))
 
+        # 提示：动态显示 API 状态与填写规则
+        has_key = bool((self.settings.get("api_key") or "").strip())
+        tip_text = (
+            "📋 填写规则：角色描述和角色名填一个即可（二选一），"
+            "描述越具体越能减少后续提问。示例：一位孤僻的图书馆管理员，毒舌但心软，喜欢吐槽读者。"
+        )
         tip = ctk.CTkLabel(
             p,
-            text="提示：角色描述和角色名填一个即可。描述越具体越能减少后续提问。示例：一位孤僻的图书馆管理员，毒舌但心软，喜欢吐槽读者。",
-            font=FONT_SMALL, text_color="#888",
+            text=tip_text,
+            font=FONT_SMALL, text_color="#888", justify="left", wraplength=560,
         )
         tip.grid(row=3, column=0, sticky="w", padx=8, pady=(0, 4))
+
+        if not has_key:
+            tip_api = ctk.CTkLabel(
+                p,
+                text="💡 建议：到 ⚙ 设置填入 API Key（DeepSeek/Kimi/OpenAI 兼容接口），"
+                     "将生成数千字的完整作者风格长卡；当前未配置，使用本地模板模式（内容较简略）。",
+                font=FONT_SMALL, text_color="#c98a2d", justify="left", wraplength=560,
+            )
+            tip_api.grid(row=4, column=0, sticky="w", padx=8, pady=(0, 4))
 
     # ---------- Tab 2：补齐信息 ----------
     def _build_clarify_tab(self, p):

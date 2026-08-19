@@ -115,6 +115,129 @@ def _detect_style(text: str) -> str:
     return "沉稳"
 
 
+# 背景专属台词池（{name} 会被替换成角色名）。背景感知让本地模板输出更有细节。
+BACKGROUND_TEMPLATES: Dict[str, List[str]] = {
+    "图书馆管理员": [
+        "嘘——这里是图书馆，{name}我可不希望被扣工资。",
+        "这本书的第三十七页，藏着上次有人折角的痕迹。",
+        "借书还书都要登记哦，这是规矩，也是缘分。",
+        "你闻到了吗？纸张的味道……比咖啡还让人上瘾。",
+        "{name}我把关门前的最后半小时，留给了常来的你。",
+        "书架会记住每一个人的阅读痕迹，当然也包括你的。",
+    ],
+    "教师/老师": [
+        "这道题讲一遍不会，{name}我就讲到你懂为止。",
+        "上课别走神，我刚才讲的可都是重点。",
+        "作业不是给我的，是给你自己的。",
+        "你是我带过最特别的一届——这句话我年年说。",
+        "犯错不可怕，可怕的是不知道自己错在哪。",
+        "下课后来办公室一趟，{name}有事跟你聊。",
+    ],
+    "学生/高中生": [
+        "啊——作业又忘了写！{name}我这次真的要完蛋了。",
+        "午休去天台吗？今天风挺大的，适合发呆。",
+        "黑板上的倒计时，看着就让人心慌。",
+        "考试卷子发下来那刻，我的心跳比八百米还快。",
+        "同桌，笔记借我抄一下，回头请你吃冰棍。",
+        "毕业以后，我们还会像现在这样经常见面吗？",
+    ],
+    "医生/护士": [
+        "放松，呼吸，{name}我给你听一下心跳。",
+        "按时吃药，比你求医问药管用一百倍。",
+        "你这情况不严重，但别硬扛，不舒服随时来。",
+        "医生的手要稳，因为那握着的是一条命。",
+        "查房的时候，我最喜欢看见病床上的笑容。",
+        "健康是攒出来的，不是熬出来的。",
+    ],
+    "侦探/警察": [
+        "案发现场的每个细节，{name}我都不会放过。",
+        "说谎的人，眼神总会下意识向右飘。",
+        "证据不会说话，但它从不说谎。",
+        "直觉告诉我，这个案子没这么简单。",
+        "真相往往藏在最不起眼的地方。",
+        "别急，让我再理一遍时间线。",
+    ],
+    "黑客/程序员": [
+        "这段代码有 bug，{name}我三分钟就能修好。",
+        "防火墙？在我面前只是个摆设。",
+        "深夜的键盘声，是我最熟悉的安眠曲。",
+        "数据不会说谎，人才会说谎。",
+        "你的密码太弱了，回头我帮你加固一下。",
+        "别慌，我已经黑进系统了——开玩笑的，我有权限。",
+    ],
+    "剑士/武士/骑士": [
+        "握剑的手，{name}我从不颤抖。",
+        "剑锋所指，即是吾心所向。",
+        "守护之名，重于性命。",
+        "这一剑，练了一千遍，只为护你周全。",
+        "战场之上，犹豫即是败北。",
+        "我的剑，只为值得守护之人而出鞘。",
+    ],
+    "魔女/魔法师/法师": [
+        "这瓶魔药，{name}我可是熬了整整三个月亮周期。",
+        "咒语的每一个音节，都必须精确无误。",
+        "魔力不是凭空而来的，是灵魂的共鸣。",
+        "禁忌的魔法之所以被禁忌，自有它的道理。",
+        "占卜的结果……说实话，我也看不透。",
+        "书架上那本最厚的书，记载着最强的法术。",
+    ],
+    "杀手/刺客": [
+        "目标锁定，{name}我从不失手。",
+        "干净利落，是这行的基本素养。",
+        "夜色是我的披风，阴影是我的藏身处。",
+        "别问我的过去，那只会让你做噩梦。",
+        "这一单做完，我就金盆洗手。",
+        "我杀人，但从不杀无辜之人。",
+    ],
+    "商人/总裁/CEO": [
+        "时间就是金钱，{name}我从不浪费。",
+        "谈判桌上，谁先露怯谁就输了。",
+        "风险与回报，永远成正比。",
+        "我雇你不是因为你便宜，是因为你值这个价。",
+        "商场如战场，每一步都要精打细算。",
+        "把眼界放长远，眼前的得失不算什么。",
+    ],
+    "咖啡师/厨师/服务员": [
+        "这杯手冲，{name}我用的是埃塞俄比亚的豆子。",
+        "今天的特供，是照着你的口味调的。",
+        "后厨的烟火气，是最踏实的味道。",
+        "慢工出细活，好菜不怕等。",
+        "客人吃得好，比什么都重要。",
+        "菜单上的每一道菜，都有它的故事。",
+    ],
+    "记者/作家/编辑": [
+        "真相面前，{name}我寸步不让。",
+        "这篇稿子，我改了三遍，还是不满意。",
+        "笔下的每一个字，都要对得起读者。",
+        "故事的结局，往往在采访现场就有了眉目。",
+        "截稿日就是我的死线，别催了。",
+        "写东西的人，最懂孤独的滋味。",
+    ],
+}
+
+
+def _detect_background(text: str) -> str:
+    """从文本中匹配背景关键词，返回背景池名（未匹配返回 ''）"""
+    rules = [
+        (("图书", "图书馆", "管理员"), "图书馆管理员"),
+        (("教师", "老师", "教授", "导师"), "教师/老师"),
+        (("高中生", "大学生", "学生", "上学", "校园"), "学生/高中生"),
+        (("医生", "护士", "大夫", "医师"), "医生/护士"),
+        (("侦探", "警察", "刑警", "警官", "探员"), "侦探/警察"),
+        (("黑客", "程序员", "工程师", "代码", "程序员"), "黑客/程序员"),
+        (("剑士", "武士", "骑士", "剑客"), "剑士/武士/骑士"),
+        (("魔女", "魔法", "法师", "巫师"), "魔女/魔法师/法师"),
+        (("杀手", "刺客", "暗杀"), "杀手/刺客"),
+        (("商人", "总裁", "CEO", "董事长", "老板"), "商人/总裁/CEO"),
+        (("咖啡师", "厨师", "服务员", "烘焙"), "咖啡师/厨师/服务员"),
+        (("记者", "作家", "编辑", "撰稿"), "记者/作家/编辑"),
+    ]
+    for kws, pool in rules:
+        if any(k in text for k in kws):
+            return pool
+    return ""
+
+
 def _extract_dialogue_examples(text: str) -> List[Dict]:
     """从原文提取互动示例（Q：xxx 换行 A：xxx 结构，最多 6 组）"""
     examples: List[Dict] = []
@@ -204,27 +327,41 @@ def extract_persona(raw_text: str, name: str = "") -> Dict[str, Any]:
 
 
 def generate_dialogue(character_dict: Dict[str, Any]) -> List[str]:
-    """本地模板生成 3-5 句对话"""
+    """本地模板生成 3-5 句对话（背景感知：优先背景专属台词，缺额补风格池）"""
     style = character_dict.get("speaking_style") or "沉稳"
-    pool = STYLE_TEMPLATES.get(style, STYLE_TEMPLATES["沉稳"])
     name = character_dict.get("name") or "你"
     catchphrase = character_dict.get("catchphrase", "")
+    bg_pool = _detect_background(character_dict.get("background") or "")
     n = random.randint(3, 5)
-    chosen = random.sample(pool, min(n, len(pool)))
-    out = [t.format(name=name) for t in chosen]
+
+    out: List[str] = []
+    if bg_pool:
+        pool_bg = BACKGROUND_TEMPLATES[bg_pool]
+        out = [t.format(name=name) for t in random.sample(pool_bg, min(n, len(pool_bg)))]
+    if len(out) < n:
+        pool = STYLE_TEMPLATES.get(style, STYLE_TEMPLATES["沉稳"])
+        need = n - len(out)
+        out += [t.format(name=name) for t in random.sample(pool, min(need, len(pool)))]
     if catchphrase and random.random() < 0.5:
         out.insert(0, f"（口头禅）{catchphrase}")
-    return out
+    return out[:n]
 
 
 def generate_quotes(character_dict: Dict[str, Any], count: int = 5) -> List[str]:
-    """本地模板生成贴合角色的原创台词（原创角色 / 无 Key 时使用）"""
+    """本地模板生成贴合角色的原创台词（背景感知：优先背景池，缺额补风格池）"""
     style = character_dict.get("speaking_style") or "沉稳"
-    pool = STYLE_TEMPLATES.get(style, STYLE_TEMPLATES["沉稳"])
     name = character_dict.get("name") or "你"
     catchphrase = character_dict.get("catchphrase", "")
-    chosen = random.sample(pool, min(count, len(pool)))
-    out = [t.format(name=name) for t in chosen]
+    bg_pool = _detect_background(character_dict.get("background") or "")
+
+    out: List[str] = []
+    if bg_pool:
+        pool_bg = BACKGROUND_TEMPLATES[bg_pool]
+        out = [t.format(name=name) for t in random.sample(pool_bg, min(count, len(pool_bg)))]
+    if len(out) < count:
+        pool = STYLE_TEMPLATES.get(style, STYLE_TEMPLATES["沉稳"])
+        need = count - len(out)
+        out += [t.format(name=name) for t in random.sample(pool, min(need, len(pool)))]
     if catchphrase and len(out) < count:
         out.append(f"「{catchphrase}」")
     return out[:count]
@@ -259,11 +396,36 @@ def generate_description(character_dict: Dict[str, Any]) -> str:
     }
     detail = detail_map.get(style, "")
 
+    # 背景专属细节（让描述更具体：结合身份写日常片段）
+    bg_pool = _detect_background(bg)
+    bg_detail_map = {
+        "图书馆管理员": "常年与书为伴，说起书页、墨香和借阅记录时眼睛会发亮，是个安静却深藏故事的人。",
+        "教师/老师": "讲台上自有一股不怒自威的气场，但课下也会为学生偷偷操碎心。",
+        "学生/高中生": "身上还带着校园的朝气和稚气，烦恼与梦想都写在脸上。",
+        "医生/护士": "白大褂之下藏着对生命的敬畏，见惯了生离死别，却仍会为一句感谢动容。",
+        "侦探/警察": "观察力敏锐到让人无所遁形，职业习惯让ta总在不经意间打量细节。",
+        "黑客/程序员": "指尖敲击键盘时是最专注的状态，屏幕蓝光下藏着整座数字世界的秘密。",
+        "剑士/武士/骑士": "身姿挺拔，指节因常年握剑而微糙，守护二字刻进了本能里。",
+        "魔女/魔法师/法师": "长袍兜帽下藏着神秘，谈起咒文与魔药时带着旁人难懂的从容。",
+        "杀手/刺客": "行走在阴影里，气息收敛得极好，一双眼却冷得像淬过冰。",
+        "商人/总裁/CEO": "西装革履，手腕上的时间比任何人都准，谈笑间已是千军万马。",
+        "咖啡师/厨师/服务员": "手指灵巧，忙碌时也记得住每位熟客的口味，烟火气里最有人情味。",
+        "记者/作家/编辑": "笔尖或话筒是ta的第二器官，习惯把故事和人心的褶皱都记录下来。",
+    }
+    bg_detail = bg_detail_map.get(bg_pool, "")
+
     end = ""
     if catchphrase:
         end = f"常挂嘴边的一句是「{catchphrase}」，几乎成了标志。"
 
-    return f"{intro}{body}{detail}{end}".strip()
+    parts = [intro, body]
+    if detail:
+        parts.append(detail)
+    if bg_detail:
+        parts.append(bg_detail)
+    if end:
+        parts.append(end)
+    return "".join(parts).strip()
 
 
 def build_fallback_card(character_dict: Dict[str, Any], quotes: List[str]) -> CharacterCard:
@@ -338,9 +500,24 @@ def fill_long_card_fallback(card: CharacterCard) -> CharacterCard:
             "若话题超出角色认知范围：以角色视角表示不解，引导回角色擅长的领域",
         ]
 
-    # 背景故事
+    # 背景故事（背景感知：有专属设定则用专属，否则用通用句）
     if not card.backstory and bg and bg != "来历不明":
-        card.backstory = [f"身份为{bg}，这是其当前最显著的社会角色。更深的过往有待发掘。"]
+        bg_story_map = {
+            "图书馆管理员": f"日复一日穿梭在书架之间，登记、归架、擦拭灰尘，直到某天一位常客的出现，让这座安静的图书馆开始有了不一样的故事。",
+            "教师/老师": f"站上讲台的第一年曾紧张到手心冒汗，如今已能一眼看穿哪个学生又在走神。批改到深夜的台灯下，ta常想：教书到底改变了谁更多一些。",
+            "学生/高中生": f"课桌一角刻着偷偷喜欢的人名字缩写，倒计时牌一天天翻页，关于未来的答案还没想好，但今天的小小烦恼已经足够占据全部心事。",
+            "医生/护士": f"消毒水的气味是最熟悉的安全感。见过凌晨三点的急诊室，也见过病人家属攥紧的手，白大褂之下，是一颗比谁都更敬畏生命的平常心。",
+            "侦探/警察": f"案卷堆叠的办公桌上总有杯凉透的咖啡。ta相信每个现场都会留下痕迹，也相信那些说不出口的证词里，藏着比线索更重要的东西。",
+            "黑客/程序员": f"屏幕的蓝光映着专注的侧脸，指尖在键盘上敲出只有ta懂的节奏。别人眼中的乱码，在ta眼里是一个个待解的秘密。",
+            "剑士/武士/骑士": f"从小握剑练到指尖起茧，宣誓守护的那天风很大。如今剑仍在鞘中，而真正需要守护的，早已不只是剑柄所指的方向。",
+            "魔女/魔法师/法师": f"古堡书房里的烛火常年不熄，药草与咒文的气味混在一起。ta总说魔法源于灵魂，却从不肯细说，那究竟是天赋还是代价。",
+            "杀手/刺客": f"没有人知道ta的过去，只知道目标从未失手。直到某次任务里那一个犹豫的瞬间，让ta开始怀疑这条路的尽头究竟是什么。",
+            "商人/总裁/CEO": f"从第一桶金到如今，靠的是一步三算。会议室的落地窗外是整座城市的灯火，可ta偶尔也会想起，最初那个连房租都发愁的自己。",
+            "咖啡师/厨师/服务员": f"围裙口袋里的记账笔换了一根又一根，熟客的口味都记在心里。烟火气升腾的间隙，ta会觉得这样平凡的日子，其实最接近幸福。",
+            "记者/作家/编辑": f"采访本上密密麻麻的字迹是ta的武器。为了一个真相可以蹲守三天，也可以为一句话的措辞改到深夜，这是文字工作者的倔强。",
+        }
+        story = bg_story_map.get(_detect_background(bg), f"身份为{bg}，这是其当前最显著的社会角色。更深的过往有待发掘。")
+        card.backstory = [story]
 
     # 语言风格
     if not card.language_style:
