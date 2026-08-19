@@ -1,27 +1,47 @@
-# Character Card Maker
+# Character Card Maker (人物卡生成器)
 
-> **⚠️ Work in Progress** — Features and UI may change at any time. No stable release yet. Feedback is welcome.
+> A desktop GUI tool that turns a one-line character idea into a complete, ready-to-feed **character card** for roleplay AI / agent persona swapping.
 
-A desktop GUI tool that turns a one-line character idea into a complete **character card**: it fills in missing persona details, generates **character lines** and **in-character dialogue**, and asks you to confirm the persona before saving.
+把一句话人设变成可直接喂给 AI 做角色扮演 / agent 换皮的**完整分层角色卡**。模仿抖音角色卡作者「夏夜雨绵y」（千夏/达妮娅/夏弥/多托雷）的卡面结构。
 
 ## Features
 
-- **Desktop GUI** — dark CustomTkinter interface, fully mouse-driven, no command line required.
-- **Asks when it's not sure** — if the speaking style, catchphrase, background, or personality traits are missing, it walks you through them one by one, with dropdown options, free-form input, and a skip button.
-- **Dual-mode dialogue generation**:
-  - **AI mode** (with API key): calls any OpenAI-compatible model (DeepSeek / Kimi / OpenAI, etc.) to write natural, in-character dialogue and a persona summary.
-  - **Local template mode** (no key): built-in dialogue templates for 8 speaking styles (sharp-tongued / gentle / aloof / chuunibyou / calm / lively / mature / airheaded) — works out of the box.
-- **Character lines that they actually said**:
-  - **AI mode**: the LLM recalls real lines from well-known characters; for original characters it writes lines that fit the persona.
-  - **No key**: matches against the built-in quote library (`quotes/characters.json`, 25+ characters like Luffy, Conan, Sun Wukong), then tries web search, then falls back to templates.
-  - **Original characters never get canned quotes** — no more "everyone says 天行健".
-- **Online character research**: for real, existing characters, the app searches the web (Moegirlpedia first, Bing as fallback) and shows what it found in a dedicated "Character Info (Web)" section of the card. With an API key, the research is fed to the AI as source material.
-- **Final confirmation**: after the persona summary is generated, a dialog asks whether it's accurate. If not, you can give one-line feedback and the AI regenerates with the correction in mind.
-- **Export**: saves `cards/{character}_{timestamp}.md` (readable card) and `.json` (structured data).
+### 🎴 Author-style long card (v0.4+)
+Generates a structured, layered card modeled on the popular Douyin character-card author's style:
+
+- **System instruction layer** — core instruction, self-referral rules, address rules, output constraints, OOC defense
+- **Character profile layer** — background story, language style, classic lines, social relations, likes & dislikes, core values
+- **Affinity system (好感度)** — 5-level affinity ladder, dialogue tables per level, inner-monologue library, physical-interaction feedback
+- **Relationship / story layers** — social-relation table, communication codes, scene dialogue scripts, story timeline
+
+### 🎭 Three style branches (卡片风格分支)
+| Branch | Focus |
+|--------|-------|
+| 通用 (General) | Balanced default |
+| 恋爱养成 (Romance/Raising) | Affinity 5-level system + dialogue table + inner monologues + physical interactions |
+| 宿命剧情 (Fated Story) | Relationship five-piece set + theme deepening + meta language style |
+| CP互动 (CP Interaction) | Communication-code mechanism + scene script library + story timeline + tri-state language style |
+
+### 🤖 Dual-mode generation
+- **AI mode** (with API key): calls any OpenAI-compatible model (DeepSeek / Kimi / OpenAI / Qwen…) to write a full 23-key long card (up to 8000 tokens), tuned per branch.
+- **Local template mode** (no key): **background-aware** templates — 12 profession-specific dialogue pools (librarian / teacher / student / doctor / detective / hacker / swordsman / witch / assassin / merchant / chef / reporter), auto-detected from the description, plus 8 speaking-style pools.
+
+### 🧩 Smart input
+- **Name & description are either-or** — fill in one. If you only give a description, the name is auto-extracted (`「名字」`, `名叫X`, `名字叫X` …).
+- **Guided clarification** — missing fields are asked one by one (dropdown + free input + skip).
+- Real characters get their **actual spoken lines** (AI recall → built-in quote library → web search → templates), original characters never get canned quotes.
+
+### 🎨 Polished dark UI
+- **霞鹜文楷 (LXGW WenKai)** bundled font — loaded privately via GDI, auto-fallback to 微软雅黑
+- Warm-gold dark theme, one-click launcher on desktop
+
+## Screenshots
+
+*(coming soon)*
 
 ## Installation
 
-Requires Python 3.10+ (tested on Python 3.12).
+Requires **Python 3.10+** (tested on 3.12). Windows recommended (font loading uses GDI).
 
 ```bash
 cd character-card-maker
@@ -32,35 +52,35 @@ Dependencies: `customtkinter`, `requests`.
 
 ## Usage
 
-### Step 1: Enter the persona
-In the "① 人设输入" tab, describe your character in a sentence or two. For example:
+### Quick start
 
-> A reclusive librarian, sharp-tongued but soft-hearted, likes to mock the readers
+**Double-click `启动人物卡生成器.bat`** (or the desktop shortcut「人物卡生成器」) — starts with `pythonw.exe`, no console window.
 
-The character name can be left blank (the app will let you set it later). Click "⚙ 设置" in the top-right to configure an API key (see below).
+### Step 1 — Enter the persona
 
-### Step 2: Fill in the details
-Switch to the "② 补齐信息" tab. The app extracts speaking style, catchphrase, background, and traits from your description. **Fields it couldn't detect are asked one by one**:
+In the "① 人设输入" tab, describe the character. Either field is enough:
 
-- Each question offers a dropdown of options plus a free-form input — just pick one or type your own, then hit "✅ 确认" (Enter works too).
-- A live summary of the current persona is shown on the right.
-- Once the last question is answered, the app **auto-jumps to generation** — no extra button to press. The "⏩ 跳过剩余，直接生成" button is there only if you want to skip the remaining questions and generate right away.
+- **角色描述** — e.g. `一位孤僻的图书馆管理员，毒舌但心软，喜欢吐槽读者`
+- **角色名** — optional; auto-extracted from the description if blank
 
-### Step 3: Generate
-In the "③ 生成结果" tab, the app:
+> 💡 Without an API key, a hint suggests configuring one — AI mode produces far richer cards.
 
-1. Collects 5 character lines (AI mode recalls/creates them; no-key mode: built-in library → web search → templates).
-2. Generates 3–5 in-character dialogues (AI in AI mode, templates otherwise).
-3. Writes a persona summary.
+### Step 2 — Fill in the details
 
-The result is shown as a full markdown card, including sections for **character info (web research)**, **relationships**, **likes & dislikes**, and **core values** (the last three require AI mode). You can "🔄 重新生成" or "✏ 编辑描述" to adjust.
+The "② 补齐信息" tab asks for anything the description didn't cover (speaking style, catchphrase, background, traits…), one field at a time with dropdown options, free-form input, or skip.
 
-### Step 4: Confirm accuracy
-Click "✅ 确认准确，保存卡片" to open the confirmation dialog with the full persona summary. Three options:
+### Step 3 — Generate
 
-- **准确，保存卡片**: saves to the `cards/` directory and lets you open the folder.
-- **不准确，重新生成**: type what's wrong; the feedback is fed back to the AI for regeneration.
-- **手动修改后保存**: edit the summary text directly, then save.
+In "③ 生成结果", the app builds the full long card. From here you can:
+
+- **🔄 重新生成** — regenerate
+- **✏ 编辑人设总结** — edit only the persona-summary paragraph (bottom section)
+- **📋 复制全文** — copy the complete markdown card to clipboard
+- **✅ 确认准确，保存卡片** — opens a full-card preview dialog; then **save as** `.txt` / `.md` / `.json` anywhere, or copy the full card
+
+### Step 4 — Save / share
+
+The saved `.md` card is the final deliverable — paste it into any roleplay AI or agent persona.
 
 ## API Configuration (optional but recommended)
 
@@ -71,20 +91,24 @@ Click "⚙ 设置" on the main window:
 | API Base URL | OpenAI-compatible endpoint | `https://api.deepseek.com/v1` |
 | API Key | Your key (leave blank for local template mode) | `sk-...` |
 | Model | Model to call | `deepseek-chat` |
-| 联网搜索角色台词 | Web search for character lines (no-key mode) | on |
+| 联网搜索角色台词 | Web search for character lines | on |
+| 附加 Roleplay 引擎 | Appends a HUD/status-panel engine template (**off by default**) | off |
+| 卡片风格分支 | 通用 / 恋爱养成 / 宿命剧情 / CP互动 | 通用 |
 
-Settings are stored in `settings.json`. **Leaving the API key blank still works** — dialogue and summary just fall back to local templates.
+Settings are stored in `settings.json` (git-ignored — **your API key never gets committed**).
 
 ### Common endpoints
 
-- **DeepSeek**: Base URL `https://api.deepseek.com/v1`, model `deepseek-chat`
-- **Kimi (Moonshot)**: Base URL `https://api.moonshot.cn/v1`, model `moonshot-v1-8k`
-- **OpenAI**: Base URL `https://api.openai.com/v1`, model `gpt-4o-mini`
-- **Qwen (通义千问)**: Base URL `https://dashscope.aliyuncs.com/compatible-mode/v1`, model `qwen-turbo`
+| Provider | Base URL | Model |
+|----------|----------|-------|
+| DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| Kimi (Moonshot) | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| Qwen (通义千问) | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-turbo` |
 
 ## Customizing the Quote Library
 
-Edit `quotes/characters.json` to extend the built-in library — format is "character name → array of lines":
+Edit `quotes/characters.json` — format is "character name → array of lines":
 
 ```json
 {
@@ -92,28 +116,41 @@ Edit `quotes/characters.json` to extend the built-in library — format is "char
 }
 ```
 
-Both exact and substring matching are supported (e.g. "蒙奇·D·路飞" matches "路飞"). Matched characters get their **real spoken lines** — no web search, no fabrication.
+Both exact and substring matching are supported. Matched characters get their **real spoken lines**.
 
 ## Project Structure
 
 ```
 character-card-maker/
-├── main.py              # Entry point + GUI main program
-├── character_model.py   # Character card data model
-├── settings_manager.py  # Settings persistence
-├── llm_client.py        # OpenAI-compatible API client
-├── quote_service.py     # Character lines & info (local library + web search)
-├── template_generator.py# Local template fallback generator
-├── requirements.txt     # Dependencies
-├── settings.json        # Settings (created on first run)
-├── quotes/              # Built-in quote library
-│   └── characters.json  # character name → real lines (extendable)
-└── cards/               # Saved character cards (created on first run)
+├── main.py                 # Entry point + GUI main program
+├── character_model.py      # Character card data model (23-key structure)
+├── llm_client.py           # OpenAI-compatible API client (branch-aware prompts)
+├── template_generator.py   # Local template fallback (background-aware pools)
+├── quote_service.py        # Character lines & info (local library + web search)
+├── settings_manager.py     # Settings persistence
+├── 启动人物卡生成器.bat     # One-click launcher (pythonw, no console)
+├── requirements.txt        # Dependencies
+├── fonts/                  # Bundled 霞鹜文楷 (LXGW WenKai) fonts
+├── quotes/                 # Built-in quote library
+│   └── characters.json
+├── templates/              # Roleplay engine template (optional add-on)
+├── cards/                  # Saved character cards (auto-created)
+└── settings.json           # Local settings — git-ignored (API key stays private)
 ```
 
 ## Technical Notes
 
 - All network requests run on a separate thread; the UI never freezes.
-- If an AI call fails, the app automatically degrades to local template mode without breaking the flow.
-- Character lines are obtained via a cascade: AI mode (LLM recall/create) → built-in library → web search → templates. Original characters never get canned quotes.
-- Output files: `.md` (human-readable) + `.json` (structured, for further processing).
+- AI call failure automatically degrades to local template mode.
+- Font loading: `AddFontResourceEx` (private, per-process) → family detection → fallback to 微软雅黑.
+- Character lines cascade: AI mode → built-in library → web search → templates. Original characters never get canned quotes.
+- Card export: `.txt` / `.md` (human-readable markdown) + `.json` (structured data).
+
+## Roadmap
+
+- [x] v0.3 — Long-card structure + Roleplay engine add-on
+- [x] v0.4 — Author-style 23-key card + 3 style branches
+- [x] v0.4.1 — Save-as dialog, copy full card, name/description either-or
+- [x] v0.4.5 — Background-aware local templates (12 profession pools)
+- [x] v0.4.6 — 霞鹜文楷 font + warm-gold dark theme
+- [x] v0.4.7 — One-click desktop launcher
