@@ -11,6 +11,7 @@ DEFAULTS: Dict[str, Any] = {
     "base_url": "https://api.deepseek.com/v1",
     "model": "deepseek-chat",
     "use_web_search": True,
+    "use_roleplay_engine": True,   # 保存卡片时附加 Roleplay 引擎模板（思维链/状态栏/时间流逝/行动推荐）
 }
 
 

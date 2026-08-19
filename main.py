@@ -17,7 +17,19 @@ from character_model import CharacterCard
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CARDS_DIR = os.path.join(BASE_DIR, "cards")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 os.makedirs(CARDS_DIR, exist_ok=True)
+
+
+def _load_roleplay_engine() -> str:
+    """读取 Roleplay 引擎模板（附加到卡片末尾，启用思维链/状态栏/时间流逝/行动推荐）"""
+    try:
+        p = os.path.join(TEMPLATES_DIR, "roleplay_engine.txt")
+        with open(p, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception as e:
+        print(f"[roleplay] 模板读取失败: {e}")
+        return ""
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -213,16 +225,23 @@ class App(ctk.CTk):
             sw_search.select()
         sw_search.grid(row=3, column=1, sticky="w", pady=6, padx=(8, 0))
 
+        ctk.CTkLabel(form, text="附加 Roleplay 引擎：", font=FONT).grid(row=4, column=0, sticky="w", pady=6)
+        sw_engine = ctk.CTkSwitch(form, text="开启（思维链/状态栏/时间流逝/行动推荐）", font=FONT_SMALL)
+        if s.get("use_roleplay_engine", True):
+            sw_engine.select()
+        sw_engine.grid(row=4, column=1, sticky="w", pady=6, padx=(8, 0))
+
         def save():
             self.settings["base_url"] = e_base.get().strip() or "https://api.deepseek.com/v1"
             self.settings["api_key"] = e_key.get().strip()
             self.settings["model"] = e_model.get().strip() or "deepseek-chat"
             self.settings["use_web_search"] = bool(sw_search.get())
+            self.settings["use_roleplay_engine"] = bool(sw_engine.get())
             sm.save(self.settings)
             win.destroy()
             messagebox.showinfo("设置", "已保存。", parent=self)
 
-        ctk.CTkButton(win, text="💾 保存设置", font=FONT_BTN, command=save).grid(row=4, column=0, pady=12)
+        ctk.CTkButton(win, text="💾 保存设置", font=FONT_BTN, command=save).grid(row=5, column=0, pady=12)
 
     # ---------- 流程：输入 → 澄清 ----------
     def go_clarify(self):
@@ -395,69 +414,133 @@ class App(ctk.CTk):
             if name and name != "未命名角色" and self.settings.get("use_web_search", True):
                 info = qs.search_character_info(self.character, count=4)
 
-            # 名句：有 Key → LLM 输出台词（知名角色=真实台词，原创=创作）；
-            # 无 Key → 内置台词库 → 联网搜角色原话 → 模板生成
-            quotes: list = []
+            # Roleplay 引擎模板（可选附加）
+            rp_engine = ""
+            if self.settings.get("use_roleplay_engine", True):
+                rp_engine = _load_roleplay_engine()
+
+            # ---- AI 模式：一次生成完整长卡（千夏/达妮娅风格） ----
+            long_card: Dict[str, Any] = {}
             if use_api:
                 try:
-                    quotes = llm.generate_quotes_api(self.character, self.settings, n=5)
+                    long_card = llm.generate_full_card_json(
+                        self.character, self.settings, info=info,
+                        correction=self.correction)
                 except Exception as e:
-                    print(f"[llm quotes] 失败降级: {e}")
-            if not quotes:
-                if name and name != "未命名角色":
-                    quotes = qs.match_local_character_quotes(name, count=5)
-                    if not quotes and self.settings.get("use_web_search", True):
-                        quotes = qs.search_character_quotes(name, count=5)
-            if not quotes:
-                quotes = tg.generate_quotes(self.character, count=5)
+                    print(f"[llm full-card] 失败降级分段生成: {e}")
 
-            # 扩展档案（社交关系/喜好厌恶/核心观念）：仅 AI 模式可生成
-            relationships: list = []
-            likes_dislikes: list = []
-            core_values: list = []
-            if use_api:
-                try:
-                    extras = llm.generate_profile_extras(
-                        self.character, self.settings, info=info)
-                    relationships = extras.get("relationships") or []
-                    likes_dislikes = extras.get("likes_dislikes") or []
-                    core_values = extras.get("core_values") or []
-                except Exception as e:
-                    print(f"[llm extras] 失败跳过: {e}")
-
-            if use_api:
+            if long_card.get("core_instruction"):
+                # 完整长卡模式
+                quotes = long_card.get("quotes") or []
+                dialogues: list = []
+                description = ""
                 try:
                     dialogues = llm.generate_dialogue_api(self.character, self.settings, n=4)
                 except Exception as e:
                     print(f"[llm dialogue] 失败降级模板: {e}")
                     dialogues = tg.generate_dialogue(self.character)
-                    mode_tag = "本地模板模式（AI 调用失败）"
                 try:
                     description = llm.generate_description_api(
                         self.character, self.settings, correction=self.correction)
                 except Exception as e:
                     print(f"[llm desc] 失败降级模板: {e}")
                     description = tg.generate_description(self.character)
+                if not quotes:
+                    quotes = tg.generate_quotes(self.character, count=5)
+                card = CharacterCard(
+                    name=self.character.get("name", "未命名角色"),
+                    traits=list(self.character.get("traits") or []),
+                    speaking_style=self.character.get("speaking_style") or "沉稳",
+                    catchphrase=self.character.get("catchphrase") or "",
+                    background=self.character.get("background") or "",
+                    quotes=quotes,
+                    dialogues=dialogues,
+                    description=description,
+                    dialogue_examples=list(self.character.get("dialogue_examples") or []),
+                    interaction_rules=list(self.character.get("interaction_rules") or []),
+                    info=info,
+                    meta=long_card.get("meta") or {},
+                    core_instruction=long_card.get("core_instruction") or "",
+                    output_rules=long_card.get("output_rules") or [],
+                    ooc_defense=long_card.get("ooc_defense") or [],
+                    basic_info=long_card.get("basic_info") or {},
+                    backstory=long_card.get("backstory") or [],
+                    relationships=long_card.get("relationships") or [],
+                    how_referred=long_card.get("how_referred") or {},
+                    language_style=long_card.get("language_style") or {},
+                    classic_lines=long_card.get("classic_lines") or {},
+                    likes_dislikes=long_card.get("likes_dislikes") or [],
+                    core_values=long_card.get("core_values") or [],
+                    roleplay_engine=rp_engine,
+                )
+                mode_tag = "AI 完整长卡模式"
             else:
-                dialogues = tg.generate_dialogue(self.character)
-                description = tg.generate_description(self.character)
+                # ---- 降级路径：分段生成（旧逻辑） ----
+                quotes: list = []
+                if use_api:
+                    try:
+                        quotes = llm.generate_quotes_api(self.character, self.settings, n=5)
+                    except Exception as e:
+                        print(f"[llm quotes] 失败降级: {e}")
+                if not quotes:
+                    if name and name != "未命名角色":
+                        quotes = qs.match_local_character_quotes(name, count=5)
+                        if not quotes and self.settings.get("use_web_search", True):
+                            quotes = qs.search_character_quotes(name, count=5)
+                if not quotes:
+                    quotes = tg.generate_quotes(self.character, count=5)
 
-            card = CharacterCard(
-                name=self.character.get("name", "未命名角色"),
-                traits=list(self.character.get("traits") or []),
-                speaking_style=self.character.get("speaking_style") or "沉稳",
-                catchphrase=self.character.get("catchphrase") or "",
-                background=self.character.get("background") or "",
-                quotes=quotes,
-                dialogues=dialogues,
-                description=description,
-                dialogue_examples=list(self.character.get("dialogue_examples") or []),
-                interaction_rules=list(self.character.get("interaction_rules") or []),
-                info=info,
-                relationships=relationships,
-                likes_dislikes=likes_dislikes,
-                core_values=core_values,
-            )
+                relationships: list = []
+                likes_dislikes: list = []
+                core_values: list = []
+                if use_api:
+                    try:
+                        extras = llm.generate_profile_extras(
+                            self.character, self.settings, info=info)
+                        relationships = extras.get("relationships") or []
+                        likes_dislikes = extras.get("likes_dislikes") or []
+                        core_values = extras.get("core_values") or []
+                    except Exception as e:
+                        print(f"[llm extras] 失败跳过: {e}")
+
+                if use_api:
+                    try:
+                        dialogues = llm.generate_dialogue_api(self.character, self.settings, n=4)
+                    except Exception as e:
+                        print(f"[llm dialogue] 失败降级模板: {e}")
+                        dialogues = tg.generate_dialogue(self.character)
+                        mode_tag = "本地模板模式（AI 调用失败）"
+                    try:
+                        description = llm.generate_description_api(
+                            self.character, self.settings, correction=self.correction)
+                    except Exception as e:
+                        print(f"[llm desc] 失败降级模板: {e}")
+                        description = tg.generate_description(self.character)
+                else:
+                    dialogues = tg.generate_dialogue(self.character)
+                    description = tg.generate_description(self.character)
+
+                card = CharacterCard(
+                    name=self.character.get("name", "未命名角色"),
+                    traits=list(self.character.get("traits") or []),
+                    speaking_style=self.character.get("speaking_style") or "沉稳",
+                    catchphrase=self.character.get("catchphrase") or "",
+                    background=self.character.get("background") or "",
+                    quotes=quotes,
+                    dialogues=dialogues,
+                    description=description,
+                    dialogue_examples=list(self.character.get("dialogue_examples") or []),
+                    interaction_rules=list(self.character.get("interaction_rules") or []),
+                    info=info,
+                    relationships=relationships,
+                    likes_dislikes=likes_dislikes,
+                    core_values=core_values,
+                    roleplay_engine=rp_engine,
+                )
+                # 无 Key 时用模板拼装长卡分层结构
+                if not use_api:
+                    card = tg.fill_long_card_fallback(card)
+
             self.last_card = card
             self.after(0, lambda: self._render_card(card, mode_tag))
         except Exception as e:

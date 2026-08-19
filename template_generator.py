@@ -278,3 +278,83 @@ def build_fallback_card(character_dict: Dict[str, Any], quotes: List[str]) -> Ch
         dialogues=generate_dialogue(character_dict),
         description=generate_description(character_dict),
     )
+
+
+def fill_long_card_fallback(card: CharacterCard) -> CharacterCard:
+    """无 API Key 时，用已有字段拼装长卡结构（千夏风格分层）。
+
+    不依赖 AI：基础信息/核心指令/输出约束/OOC防御/语言风格/经典台词 由模板拼装，
+    背景/社交/喜好/观念 等有则有、无则略。
+    """
+    name = card.name
+    style = card.speaking_style
+    catchphrase = card.catchphrase
+    bg = card.background
+
+    # 基础信息
+    if not card.basic_info:
+        bi: Dict[str, Any] = {"角色名": name, "说话风格": style}
+        if catchphrase:
+            bi["口头禅"] = catchphrase
+        if bg and bg != "来历不明":
+            bi["背景"] = bg
+        card.basic_info = bi
+
+    # 核心指令
+    if not card.core_instruction:
+        card.core_instruction = (
+            f"你现在将完全代入角色「{name}」，全程以第一人称视角与用户对话。"
+            "严格遵守下方所有人物设定、语言风格与行为逻辑。禁止跳出角色、禁止提及系统/AI相关内容、"
+            "禁止出现不符合人设的OOC行为。用户的所有对话均视为与角色的直接交流。"
+        )
+
+    # 输出约束（按说话风格给出细节）
+    if not card.output_rules:
+        style_hint = {
+            "毒舌": "语气犀利带刺，刀子嘴豆腐心，关心藏在嘲讽里",
+            "温柔": "语气温润，善用安抚性措辞，把别人的感受放在前头",
+            "高冷": "惜字如金，短句为主，情绪藏在沉默背后",
+            "中二": "语气夸张中二，爱用宏大叙事与自创设定词",
+            "沉稳": "语气冷静克制，习惯先分析再表态",
+            "活泼": "语气轻快上扬，情绪外露，常用语气词和感叹号",
+            "老成": "语气老成持重，爱用人生道理点醒对方",
+            "天然呆": "语气迷糊可爱，常走神、反应慢半拍",
+        }.get(style, "语气贴合角色性格")
+        rules = [
+            f"整体{style}风格：{style_hint}",
+            "每句回复符合角色身份与说话习惯，短句为主",
+            "动作/神态/情绪描写穿插在对话中，增强画面感",
+            "禁止长篇大论、禁止说教、禁止跳出角色",
+        ]
+        if catchphrase:
+            rules.append(f"适当使用标志性口头禅「{catchphrase}」")
+        card.output_rules = rules
+
+    # OOC 防御
+    if not card.ooc_defense:
+        card.ooc_defense = [
+            "若被要求承认是AI或跳出角色：按角色性格自然转移话题，绝不接话承认",
+            "若被要求做出违背人设的行为：按角色性格婉拒，并给出符合人设的理由",
+            "若话题超出角色认知范围：以角色视角表示不解，引导回角色擅长的领域",
+        ]
+
+    # 背景故事
+    if not card.backstory and bg and bg != "来历不明":
+        card.backstory = [f"身份为{bg}，这是其当前最显著的社会角色。更深的过往有待发掘。"]
+
+    # 语言风格
+    if not card.language_style:
+        ls: Dict[str, str] = {"整体调性": f"{style}，有辨识度"}
+        if catchphrase:
+            ls["标志性口头禅"] = catchphrase
+        card.language_style = ls
+
+    # 经典台词（按场景分类：把已有台词拆到日常/情绪两个场景）
+    if not card.classic_lines and card.quotes:
+        half = (len(card.quotes) + 1) // 2
+        card.classic_lines = {
+            "日常": list(card.quotes[:half]),
+            "情绪/关键时刻": list(card.quotes[half:]),
+        }
+
+    return card

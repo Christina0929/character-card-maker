@@ -14,7 +14,8 @@ def is_configured(settings: Dict[str, Any]) -> bool:
     return bool(settings.get("api_key", "").strip()) and bool(settings.get("base_url", "").strip())
 
 
-def generate(prompt: str, settings: Dict[str, Any], system_prompt: Optional[str] = None, timeout: int = 45) -> str:
+def generate(prompt: str, settings: Dict[str, Any], system_prompt: Optional[str] = None,
+             timeout: int = 45, max_tokens: int = 1500) -> str:
     """调用 chat completions 接口，返回文本"""
     api_key = settings.get("api_key", "").strip()
     base_url = settings.get("base_url", "").strip().rstrip("/")
@@ -38,7 +39,7 @@ def generate(prompt: str, settings: Dict[str, Any], system_prompt: Optional[str]
         "model": model,
         "messages": messages,
         "temperature": 0.8,
-        "max_tokens": 1500,
+        "max_tokens": max_tokens,
     }
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
@@ -185,6 +186,102 @@ def _parse_json_list(raw: str) -> List[str]:
     # 兜底：按行拆分
     lines = [l.strip().lstrip("0123456789.-、）) ").strip() for l in raw.splitlines() if l.strip()]
     return lines[:10]
+
+
+def generate_full_card_json(character_dict: Dict[str, Any], settings: Dict[str, Any],
+                            info: Optional[List[str]] = None,
+                            correction: str = "") -> Dict[str, Any]:
+    """调用 LLM 一次生成「千夏/达妮娅风格」完整长卡 JSON。
+
+    结构：system_instruction 层（核心指令/输出约束/OOC防御）
+    + character_profile 层（基础信息/性格/背景/社交/称呼/语言风格/经典台词/喜好/观念）。
+    info 为联网收集的角色资料（真实角色不可编造冲突设定）。
+    返回键见 _EMPTY_CARD。
+    """
+    persona = _persona_text(character_dict)
+    if info:
+        info_text = "\n".join(f"- {x}" for x in info)
+        persona += f"\n\n联网收集到的该角色资料（参考素材，必须依据，不得编造冲突设定）：\n{info_text}"
+    system = ("你是一位资深角色设定师，擅长撰写可直接用于 AI 角色扮演的完整角色卡。"
+              "你产出的卡片结构严谨、信息密度高、有画面感。")
+    prompt = (
+        f"{persona}\n\n"
+        "请为这个角色生成一份完整的 AI 角色扮演卡片，必须是一个 JSON 对象，键名如下：\n"
+        "1. core_instruction（字符串）：核心扮演指令，2-3 句。要求完全代入角色、第一人称、"
+        "禁止跳出角色/提及AI/禁止OOC。可包含自称/称谓规则；\n"
+        "2. output_rules（字符串数组，4-6条）：输出约束。含回复格式（如动作/神态描写→表面台词→内心独白）、"
+        "语气特征、情绪表现、小动作等细节、禁止事项；\n"
+        "3. ooc_defense（字符串数组，2-3条）：OOC 防御规则。给出被要求承认是AI、被要求违背人设时"
+        "角色应如何自然应对（给一句符合人设的回应示例）；\n"
+        "4. basic_info（对象）：角色基础信息，尽量多填字段，如 角色名/别名/年龄/性别/身份/所属/外貌/"
+        "服装/性格概括/生日/身高/爱好/居住地 等；\n"
+        "5. backstory（字符串数组，3-5条）：核心背景故事，有条理、有转折；\n"
+        "6. relationships（字符串数组，3-5条）：社交关系网，每条形如「人物/阵营 - 身份 - 关系定位 - 互动特点」，"
+        "没有明确人际关系时写「待定 - 关系留白」；\n"
+        "7. how_referred（对象）：他人称呼汇总，键如 通用称呼/亲近称呼/特殊称呼；\n"
+        "8. language_style（对象）：语言与台词风格，键如 整体调性/语气特征/表达习惯/标志性口头禅；\n"
+        "9. classic_lines（对象）：经典核心台词，按场景分类，键为场景名（如 日常/战斗/害羞/独处），"
+        "值是该场景下的 2-4 句台词数组；\n"
+        "10. likes_dislikes（字符串数组，4-6条）：喜好与厌恶，每条形如「喜欢：xxx」或「厌恶：xxx」；\n"
+        "11. core_values（字符串数组，3-5条）：核心观念与行为逻辑，每条一句话概括一条处世原则；\n"
+        "12. quotes（字符串数组，5-6条）：角色的经典台词（知名角色必须是其真实说过的台词，不能编造）。\n"
+        "要求：知名作品中的真实角色必须严格依据原作设定与联网资料；原创角色自由创作但要有血肉、有细节。\n"
+        "只输出 JSON 对象，不要解释、不要 markdown 代码块。"
+    )
+    if correction:
+        prompt += f"\n\n用户反馈上次生成不准确，请参考修正：{correction}"
+    raw = generate(prompt, settings, system_prompt=system, max_tokens=4000)
+    return _parse_card_json(raw)
+
+
+_EMPTY_CARD: Dict[str, Any] = {
+    "core_instruction": "",
+    "output_rules": [],
+    "ooc_defense": [],
+    "basic_info": {},
+    "backstory": [],
+    "relationships": [],
+    "how_referred": {},
+    "language_style": {},
+    "classic_lines": {},
+    "likes_dislikes": [],
+    "core_values": [],
+    "quotes": [],
+}
+
+
+def _parse_card_json(raw: str) -> Dict[str, Any]:
+    """从 LLM 返回中解析完整长卡 JSON（容错 markdown 代码块），失败返回 _EMPTY_CARD 的副本"""
+    raw = raw.strip()
+    m = re.search(r"```(?:json)?\s*(.*?)\s*```", raw, re.DOTALL)
+    if m:
+        raw = m.group(1).strip()
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        raw = raw[start:end + 1]
+    out: Dict[str, Any] = {k: (list(v) if isinstance(v, list) else v) for k, v in _EMPTY_CARD.items()}
+    try:
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            return out
+        for key, fallback in _EMPTY_CARD.items():
+            v = obj.get(key, fallback)
+            if isinstance(fallback, list):
+                if isinstance(v, list):
+                    out[key] = [str(x) for x in v]
+                elif isinstance(v, str) and v.strip():
+                    out[key] = [v.strip()]
+            elif isinstance(fallback, dict):
+                if isinstance(v, dict):
+                    out[key] = {str(k): v[k] for k in v}
+                elif isinstance(v, str) and v.strip():
+                    out[key] = {"内容": v.strip()}
+            elif isinstance(fallback, str):
+                out[key] = str(v).strip() if v else ""
+        return out
+    except Exception:
+        return out
 
 
 def _parse_json_object(raw: str, default: Dict[str, List[str]]) -> Dict[str, List[str]]:
