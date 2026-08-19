@@ -11,7 +11,6 @@ DEFAULTS: Dict[str, Any] = {
     "base_url": "https://api.deepseek.com/v1",
     "model": "deepseek-chat",
     "use_web_search": True,
-    "quote_category": "k",
 }
 
 

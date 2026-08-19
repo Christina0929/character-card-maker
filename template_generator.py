@@ -115,6 +115,34 @@ def _detect_style(text: str) -> str:
     return "沉稳"
 
 
+def _extract_dialogue_examples(text: str) -> List[Dict]:
+    """从原文提取互动示例（Q：xxx 换行 A：xxx 结构，最多 6 组）"""
+    examples: List[Dict] = []
+    pattern = re.compile(
+        r"(?:^|\n)\s*(?:Q|问)[:：]?\s*(?P<q>[^\n]{1,80})\s*\n\s*(?:A|答)[:：]?\s*(?P<a>[^\n]{1,160})",
+        re.MULTILINE)
+    for m in pattern.finditer(text):
+        q = m.group("q").strip()
+        a = m.group("a").strip()
+        if q and a:
+            examples.append({"q": q, "a": a})
+    return examples[:6]
+
+
+def _extract_interaction_rules(text: str) -> List[str]:
+    """从原文提取互动规则/禁忌（含「不要/别/不轻易/避免」等约束词，且带标点结尾的短句）"""
+    neg_kw = ("不要", "别", "不轻易", "不用", "尽量不", "避免", "少用", "禁用", "不说", "不许")
+    rules: List[str] = []
+    for line in text.splitlines():
+        line = line.strip().lstrip("-*• ")
+        if not line or len(line) > 60:
+            continue
+        if line.startswith(neg_kw) or (any(k in line for k in neg_kw)
+                                       and line.endswith(("。", "，", "；", ";", "！", "!", "."))):
+            rules.append(line.rstrip("。，；;.!！"))
+    return list(dict.fromkeys(rules))[:8]
+
+
 def extract_persona(raw_text: str, name: str = "") -> Dict[str, Any]:
     """从自由文本中抽取人设字段（简单启发式，不做 NLP）"""
     text = raw_text.strip()
@@ -126,6 +154,8 @@ def extract_persona(raw_text: str, name: str = "") -> Dict[str, Any]:
         "traits": [],
         "age_gender": "",
         "goal": "",
+        "dialogue_examples": _extract_dialogue_examples(text),
+        "interaction_rules": _extract_interaction_rules(text),
         "_raw": text,
     }
 
@@ -155,7 +185,10 @@ def extract_persona(raw_text: str, name: str = "") -> Dict[str, Any]:
     trait_kw = ["孤僻", "外向", "内向", "腹黑", "傲娇", "三无", "病娇",
                 "阳光", "阴郁", "热血", "冷静", "鲁莽", "谨慎", "乐观", "悲观",
                 "毒舌", "善良", "冷酷", "多疑", "轻信", "固执", "随和",
-                "精明", "憨厚", "懒散", "勤奋", "胆小", "勇敢", "心软"]
+                "精明", "憨厚", "懒散", "勤奋", "胆小", "勇敢", "心软",
+                "开朗", "活泼", "独立", "坚强", "自信", "幽默", "随性", "洒脱",
+                "内敛", "成熟", "幼稚", "温柔", "敏感", "执着", "佛系",
+                "自来熟", "慢热", "强势", "细腻", "理性", "感性"]
     for k in trait_kw:
         if k in text and k not in info["traits"]:
             info["traits"].append(k)
@@ -182,6 +215,19 @@ def generate_dialogue(character_dict: Dict[str, Any]) -> List[str]:
     if catchphrase and random.random() < 0.5:
         out.insert(0, f"（口头禅）{catchphrase}")
     return out
+
+
+def generate_quotes(character_dict: Dict[str, Any], count: int = 5) -> List[str]:
+    """本地模板生成贴合角色的原创台词（原创角色 / 无 Key 时使用）"""
+    style = character_dict.get("speaking_style") or "沉稳"
+    pool = STYLE_TEMPLATES.get(style, STYLE_TEMPLATES["沉稳"])
+    name = character_dict.get("name") or "你"
+    catchphrase = character_dict.get("catchphrase", "")
+    chosen = random.sample(pool, min(count, len(pool)))
+    out = [t.format(name=name) for t in chosen]
+    if catchphrase and len(out) < count:
+        out.append(f"「{catchphrase}」")
+    return out[:count]
 
 
 def generate_description(character_dict: Dict[str, Any]) -> str:

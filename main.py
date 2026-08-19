@@ -102,30 +102,25 @@ class App(ctk.CTk):
         body = ctk.CTkFrame(p, fg_color="transparent")
         body.grid(row=1, column=0, sticky="nsew", padx=8, pady=4)
         body.grid_columnconfigure(0, weight=1)
-        body.grid_rowconfigure(3, weight=1)
+        body.grid_rowconfigure(2, weight=1)
 
         self.q_label = ctk.CTkLabel(body, text="（开始）", font=FONT,
                                      wraplength=900, justify="left")
-        self.q_label.grid(row=0, column=0, sticky="w", pady=(0, 4))
+        self.q_label.grid(row=0, column=0, sticky="w", pady=(0, 8))
 
-        opts = ctk.CTkFrame(body, fg_color="transparent")
-        opts.grid(row=1, column=0, sticky="ew", pady=4)
-        opts.grid_columnconfigure(0, weight=1)
-        self.q_combo = ctk.CTkComboBox(opts, font=FONT, values=["请选择"])
-        self.q_combo.grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        ctk.CTkButton(opts, text="采用该选项", width=110, font=FONT_BTN,
-                      command=self._use_combo).grid(row=0, column=1)
-        ctk.CTkButton(opts, text="跳过（你来定）", width=130, font=FONT_BTN,
-                      fg_color="#555", command=self._skip_field).grid(row=0, column=2, padx=(8, 0))
-
-        ft = ctk.CTkFrame(body, fg_color="transparent")
-        ft.grid(row=2, column=0, sticky="ew", pady=4)
-        ft.grid_columnconfigure(0, weight=1)
-        self.q_entry = ctk.CTkEntry(ft, font=FONT)
-        self.q_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        self.q_entry.bind("<Return>", lambda e: self._use_entry())
-        ctk.CTkButton(ft, text="提交该填写", width=110, font=FONT_BTN,
-                      command=self._use_entry).grid(row=0, column=1)
+        # 一行完成：快捷选项 + 自由填写 + 确认 + 跳过
+        input_row = ctk.CTkFrame(body, fg_color="transparent")
+        input_row.grid(row=1, column=0, sticky="ew", pady=4)
+        input_row.grid_columnconfigure(1, weight=1)
+        self.q_combo = ctk.CTkComboBox(input_row, font=FONT, values=["请选择"], width=200)
+        self.q_combo.grid(row=0, column=0, padx=(0, 8))
+        self.q_entry = ctk.CTkEntry(input_row, font=FONT, placeholder_text="或自由填写…")
+        self.q_entry.grid(row=0, column=1, sticky="ew", padx=(0, 8))
+        self.q_entry.bind("<Return>", lambda e: self._confirm_answer())
+        ctk.CTkButton(input_row, text="✅ 确认", width=90, font=FONT_BTN,
+                      command=self._confirm_answer).grid(row=0, column=2, padx=(0, 8))
+        ctk.CTkButton(input_row, text="跳过", width=90, font=FONT_BTN, fg_color="#555",
+                      command=self._skip_field).grid(row=0, column=3)
 
         self.summary_box = ctk.CTkTextbox(body, font=FONT_SMALL, height=160, wrap="word")
         self.summary_box.grid(row=3, column=0, sticky="nsew", pady=(8, 4))
@@ -138,8 +133,8 @@ class App(ctk.CTk):
         self.progress_lbl.grid(row=0, column=0, sticky="w")
         ctk.CTkButton(bottom, text="← 返回修改", width=120, font=FONT_BTN, fg_color="#555",
                       command=lambda: self.tabs.set("① 人设输入")).grid(row=0, column=1, padx=(8, 0))
-        self.gen_btn = ctk.CTkButton(bottom, text="🚀 信息够了，开始生成", font=FONT_BTN,
-                                      command=self.go_generate)
+        self.gen_btn = ctk.CTkButton(bottom, text="⏩ 跳过剩余，直接生成", font=FONT_BTN,
+                                     command=self.go_generate)
         self.gen_btn.grid(row=0, column=2, padx=(8, 0))
 
         self.clarify_queue: list[str] = []
@@ -163,15 +158,18 @@ class App(ctk.CTk):
 
         btns = ctk.CTkFrame(p, fg_color="transparent")
         btns.grid(row=3, column=0, sticky="ew", padx=8, pady=(4, 8))
-        ctk.CTkButton(btns, text="🔄 重新生成", font=FONT_BTN,
-                      command=self.regenerate).grid(row=0, column=0, padx=(0, 8))
-        ctk.CTkButton(btns, text="✏ 编辑描述", font=FONT_BTN,
-                      command=self.edit_description).grid(row=0, column=1, padx=(0, 8))
-        self.confirm_btn = ctk.CTkButton(btns, text="✅ 确认：这段描述准确吗？", font=FONT_BTN,
+        btns.grid_columnconfigure(2, weight=1)
+        # 次级操作靠左
+        ctk.CTkButton(btns, text="🔄 重新生成", width=130, font=FONT_BTN, fg_color="#444",
+                      command=self.regenerate).grid(row=0, column=0, sticky="w")
+        ctk.CTkButton(btns, text="✏ 编辑描述", width=130, font=FONT_BTN, fg_color="#444",
+                      command=self.edit_description).grid(row=0, column=1, sticky="w", padx=(8, 0))
+        # 主操作靠右
+        self.confirm_btn = ctk.CTkButton(btns, text="✅ 确认准确，保存卡片", width=200, font=FONT_BTN,
                                          command=self.ask_confirm)
-        self.confirm_btn.grid(row=0, column=2, padx=(0, 8))
-        ctk.CTkButton(btns, text="← 返回修改人设", font=FONT_BTN, fg_color="#555",
-                      command=lambda: self.tabs.set("② 补齐信息")).grid(row=0, column=3)
+        self.confirm_btn.grid(row=0, column=3, sticky="e", padx=(8, 0))
+        ctk.CTkButton(btns, text="← 返回修改", width=120, font=FONT_BTN, fg_color="#555",
+                      command=lambda: self.tabs.set("② 补齐信息")).grid(row=0, column=4, sticky="e", padx=(8, 0))
 
     # ---------- 设置对话框 ----------
     def open_settings(self):
@@ -209,31 +207,22 @@ class App(ctk.CTk):
         e_model.insert(0, s.get("model", "deepseek-chat"))
         e_model.grid(row=2, column=1, sticky="ew", pady=6, padx=(8, 0))
 
-        ctk.CTkLabel(form, text="名句分类：", font=FONT).grid(row=3, column=0, sticky="w", pady=6)
-        cat_values = [f"{k} - {v}" for k, v in qs.HITOKOTO_CATEGORIES.items()]
-        cb_cat = ctk.CTkComboBox(form, font=FONT, values=cat_values)
-        cur_cat = s.get("quote_category", "k")
-        cb_cat.set(f"{cur_cat} - {qs.HITOKOTO_CATEGORIES.get(cur_cat, cur_cat)}")
-        cb_cat.grid(row=3, column=1, sticky="ew", pady=6, padx=(8, 0))
-
-        ctk.CTkLabel(form, text="联网搜索名句：", font=FONT).grid(row=4, column=0, sticky="w", pady=6)
+        ctk.CTkLabel(form, text="联网搜索角色台词：", font=FONT).grid(row=3, column=0, sticky="w", pady=6)
         sw_search = ctk.CTkSwitch(form, text="开启", font=FONT)
         if s.get("use_web_search", True):
             sw_search.select()
-        sw_search.grid(row=4, column=1, sticky="w", pady=6, padx=(8, 0))
+        sw_search.grid(row=3, column=1, sticky="w", pady=6, padx=(8, 0))
 
         def save():
             self.settings["base_url"] = e_base.get().strip() or "https://api.deepseek.com/v1"
             self.settings["api_key"] = e_key.get().strip()
             self.settings["model"] = e_model.get().strip() or "deepseek-chat"
-            cat_sel = cb_cat.get().split(" - ")[0].strip()
-            self.settings["quote_category"] = cat_sel if cat_sel in qs.HITOKOTO_CATEGORIES else "k"
             self.settings["use_web_search"] = bool(sw_search.get())
             sm.save(self.settings)
             win.destroy()
             messagebox.showinfo("设置", "已保存。", parent=self)
 
-        ctk.CTkButton(win, text="💾 保存设置", font=FONT_BTN, command=save).grid(row=3, column=0, pady=12)
+        ctk.CTkButton(win, text="💾 保存设置", font=FONT_BTN, command=save).grid(row=4, column=0, pady=12)
 
     # ---------- 流程：输入 → 澄清 ----------
     def go_clarify(self):
@@ -297,13 +286,12 @@ class App(ctk.CTk):
                                "冷静", "热血", "乐观", "精明", "懒散", "勇敢"]
         return field, ["（默认）"]
 
-    def _use_combo(self):
-        val = self.q_combo.get().strip()
-        self._apply_answer(val)
-
-    def _use_entry(self):
-        val = self.q_entry.get().strip()
-        if not val:
+    def _confirm_answer(self):
+        """确认当前答案：自由填写优先，其次快捷选项"""
+        if self.clarify_idx >= len(self.clarify_queue):
+            return
+        val = self.q_entry.get().strip() or self.q_combo.get().strip()
+        if not val or val == "请选择":
             return
         self._apply_answer(val)
 
@@ -322,6 +310,12 @@ class App(ctk.CTk):
         self.clarify_idx += 1
         self._refresh_summary()
         self._ask_current()
+        self._maybe_auto_generate()
+
+    def _maybe_auto_generate(self):
+        """关键信息全部确认完毕后，自动进入生成（无需再手动点『开始生成』）"""
+        if self.clarify_queue and self.clarify_idx >= len(self.clarify_queue):
+            self.after(400, self.go_generate)
 
     def _apply_answer(self, val):
         if self.clarify_idx >= len(self.clarify_queue):
@@ -343,6 +337,7 @@ class App(ctk.CTk):
         self.clarify_idx += 1
         self._refresh_summary()
         self._ask_current()
+        self._maybe_auto_generate()
 
     def _refresh_summary(self):
         c = self.character
@@ -354,6 +349,13 @@ class App(ctk.CTk):
                  f"性格特质：{'、'.join(c.get('traits')) if c.get('traits') else '（待定）'}"]
         if c.get("age_gender"):
             lines.append(f"性别/年龄：{c.get('age_gender')}")
+        if c.get("dialogue_examples"):
+            lines.append(f"互动示例：{len(c['dialogue_examples'])} 组（AI 会模仿其语气）")
+        if c.get("interaction_rules"):
+            shown = "；".join(c["interaction_rules"][:3])
+            if len(c["interaction_rules"]) > 3:
+                shown += "…"
+            lines.append(f"互动规则：{shown}")
         self.summary_box.configure(state="normal")
         self.summary_box.delete("1.0", "end")
         self.summary_box.insert("1.0", "\n".join(lines))
@@ -383,9 +385,45 @@ class App(ctk.CTk):
 
     def _generate_thread(self):
         try:
-            quotes = qs.get_quotes_for_character(self.character, self.settings, count=5)
             use_api = llm.is_configured(self.settings)
             mode_tag = "AI 模式" if use_api else "本地模板模式"
+
+            # 角色资料：真实存在的角色联网收集资料（原创角色跳过），
+            # 作为台词与扩展档案的参考素材
+            info: list = []
+            name = (self.character.get("name") or "").strip()
+            if name and name != "未命名角色" and self.settings.get("use_web_search", True):
+                info = qs.search_character_info(self.character, count=4)
+
+            # 名句：有 Key → LLM 输出台词（知名角色=真实台词，原创=创作）；
+            # 无 Key → 内置台词库 → 联网搜角色原话 → 模板生成
+            quotes: list = []
+            if use_api:
+                try:
+                    quotes = llm.generate_quotes_api(self.character, self.settings, n=5)
+                except Exception as e:
+                    print(f"[llm quotes] 失败降级: {e}")
+            if not quotes:
+                if name and name != "未命名角色":
+                    quotes = qs.match_local_character_quotes(name, count=5)
+                    if not quotes and self.settings.get("use_web_search", True):
+                        quotes = qs.search_character_quotes(name, count=5)
+            if not quotes:
+                quotes = tg.generate_quotes(self.character, count=5)
+
+            # 扩展档案（社交关系/喜好厌恶/核心观念）：仅 AI 模式可生成
+            relationships: list = []
+            likes_dislikes: list = []
+            core_values: list = []
+            if use_api:
+                try:
+                    extras = llm.generate_profile_extras(
+                        self.character, self.settings, info=info)
+                    relationships = extras.get("relationships") or []
+                    likes_dislikes = extras.get("likes_dislikes") or []
+                    core_values = extras.get("core_values") or []
+                except Exception as e:
+                    print(f"[llm extras] 失败跳过: {e}")
 
             if use_api:
                 try:
@@ -413,6 +451,12 @@ class App(ctk.CTk):
                 quotes=quotes,
                 dialogues=dialogues,
                 description=description,
+                dialogue_examples=list(self.character.get("dialogue_examples") or []),
+                interaction_rules=list(self.character.get("interaction_rules") or []),
+                info=info,
+                relationships=relationships,
+                likes_dislikes=likes_dislikes,
+                core_values=core_values,
             )
             self.last_card = card
             self.after(0, lambda: self._render_card(card, mode_tag))
