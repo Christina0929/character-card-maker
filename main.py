@@ -174,7 +174,7 @@ class App(ctk.CTk):
         # 次级操作靠左
         ctk.CTkButton(btns, text="🔄 重新生成", width=130, font=FONT_BTN, fg_color="#444",
                       command=self.regenerate).grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(btns, text="✏ 编辑描述", width=130, font=FONT_BTN, fg_color="#444",
+        ctk.CTkButton(btns, text="✏ 编辑人设总结", width=130, font=FONT_BTN, fg_color="#444",
                       command=self.edit_description).grid(row=0, column=1, sticky="w", padx=(8, 0))
         ctk.CTkButton(btns, text="📋 复制全文", width=130, font=FONT_BTN, fg_color="#444",
                       command=self.copy_card).grid(row=0, column=2, sticky="w", padx=(8, 0))
@@ -625,12 +625,13 @@ class App(ctk.CTk):
         if not self.last_card:
             return
         win = ctk.CTkToplevel(self)
-        win.title("✏ 编辑人设描述")
+        win.title("✏ 编辑人设总结")
         win.geometry("720x440")
         win.transient(self)
         win.grab_set()
-        ctk.CTkLabel(win, text="直接修改下方的描述，保存后会更新到卡片。",
-                     font=FONT_SMALL, text_color="#888").pack(pady=(8, 4))
+        ctk.CTkLabel(win, text="只修改卡片最底部「人设总结」这一段（不影响上方 System 指令层与角色档案层）。\n"
+                               "完整卡片的其他部分如需调整，请点「重新生成」或在输入阶段补充细节。",
+                     font=FONT_SMALL, text_color="#888", justify="left").pack(pady=(8, 4))
         tb = ctk.CTkTextbox(win, font=FONT, wrap="word")
         tb.pack(fill="both", expand=True, padx=12, pady=4)
         tb.insert("1.0", self.last_card.description)
